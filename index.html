@@ -201,7 +201,8 @@ stay hungry.</textarea>
             <span class="field-label">Look</span>
             <div class="seg" id="imgModeSeg">
               <button data-imgmode="grey" class="active">Greyscale</button>
-              <button data-imgmode="dither">Dithered</button>
+              <button data-imgmode="dither">Floyd</button>
+              <button data-imgmode="atkinson">Atkinson</button>
               <button data-imgmode="twotone">Two-tone</button>
             </div>
           </label>
@@ -371,8 +372,14 @@ anywhere."></textarea>
         <label class="check" style="margin-bottom:10px;">
           <input type="checkbox" id="ruleChk" checked=""> Accent rule under text
         </label>
-        <label class="check">
+        <label class="check" style="margin-bottom:10px;">
           <input type="checkbox" id="ditherChk"> Dither texture background
+        </label>
+        <label class="check" style="margin-bottom:10px;">
+          <input type="checkbox" id="autoTextChk"> Auto text color (contrast with photo)
+        </label>
+        <label class="check">
+          <input type="checkbox" id="safeZoneChk"> Lock-screen safe-zone guide (preview only)
         </label>
       </div>
 
@@ -768,7 +775,8 @@ var QRCodeLib = (function(){
     align:"center", vpos:"middle", margin:12, theme:"light",
     border:false, rule:true, dither:false,
     qrpos:"none", qrsize:22,
-    imgFit:"cover", imgMode:"grey", imgBright:0, imgContrast:0, imgFade:0
+    imgFit:"cover", imgMode:"grey", imgBright:0, imgContrast:0, imgFade:0,
+    autoText:false, safeZone:false
   };
   var userImage=null, imgToken=0, imgCache={canvas:null,key:""};
 
@@ -872,6 +880,25 @@ var QRCodeLib = (function(){
           }
         }
       }
+    } else if(state.imgMode==="atkinson"){
+      // Atkinson: diffuse 6/8 of the error to 6 neighbours (crisp, classic e-ink / early Mac look)
+      for(var y=0;y<H;y++){
+        for(var x=0;x<W;x++){
+          var idx=y*W+x;
+          var old=lum[idx];
+          var nw=old<128?0:255;
+          var e=(old-nw)/8;
+          lum[idx]=nw;
+          if(x+1<W) lum[idx+1]+=e;
+          if(x+2<W) lum[idx+2]+=e;
+          if(y+1<H){
+            if(x>0) lum[idx+W-1]+=e;
+            lum[idx+W]+=e;
+            if(x+1<W) lum[idx+W+1]+=e;
+          }
+          if(y+2<H) lum[idx+2*W]+=e;
+        }
+      }
     } else if(state.imgMode==="twotone"){
       for(var k=0;k<lum.length;k++) lum[k]=lum[k]<128?0:255;
     }
@@ -899,8 +926,46 @@ var QRCodeLib = (function(){
     return oc;
   }
 
+  // Average luminance (0-255) of a canvas region; samples sparsely for speed.
+  function avgLuminance(g,x,y,w,h){
+    var cw=g.canvas.width, ch=g.canvas.height;
+    var x0=Math.max(0,Math.floor(x)), y0=Math.max(0,Math.floor(y));
+    var x1=Math.min(cw,Math.ceil(x+w)), y1=Math.min(ch,Math.ceil(y+h));
+    var W=x1-x0, H=y1-y0; if(W<=0||H<=0) return 255;
+    var data;
+    try{ data=g.getImageData(x0,y0,W,H).data; }catch(e){ return 255; }
+    var step=4*Math.max(1,Math.floor((W*H)/20000));
+    var sum=0,count=0;
+    for(var i=0;i<data.length;i+=step){ sum+=0.299*data[i]+0.587*data[i+1]+0.114*data[i+2]; count++; }
+    return count?sum/count:255;
+  }
+
+  // Preview-only overlay marking where the iPhone clock, widgets and home bar sit.
+  function drawSafeZone(g,w,h){
+    g.save();
+    g.strokeStyle="rgba(194,65,12,.75)";
+    g.fillStyle="rgba(194,65,12,.10)";
+    g.lineWidth=Math.max(2,Math.round(w*0.004));
+    var dash=Math.round(w*0.02);
+    g.setLineDash([dash,Math.round(dash*0.7)]);
+    var pad=Math.round(w*0.06);
+    var zones=[
+      {y:h*0.10,h:h*0.16,label:"CLOCK / DATE"},
+      {y:h*0.27,h:h*0.10,label:"WIDGETS"},
+      {y:h*0.86,h:h*0.11,label:"HOME BAR / BUTTONS"}
+    ];
+    zones.forEach(function(z){ g.fillRect(pad,z.y,w-pad*2,z.h); g.strokeRect(pad,z.y,w-pad*2,z.h); });
+    g.setLineDash([]);
+    g.fillStyle="rgba(194,65,12,.95)";
+    g.textAlign="center"; g.textBaseline="middle";
+    var lf=Math.max(12,Math.round(w*0.032));
+    g.font="700 "+lf+"px "+FONTS.geo;
+    zones.forEach(function(z){ g.fillText(z.label, w/2, z.y+z.h/2); });
+    g.restore();
+  }
+
   // Paint a full wallpaper onto any canvas using current settings + supplied text.
-  function paint(cv, mainInput, footInput){
+  function paint(cv, mainInput, footInput, opts){
     var g = cv.getContext("2d");
     var d = currentDims(), w=d.w, h=d.h;
     cv.width=w; cv.height=h;
@@ -967,7 +1032,16 @@ var QRCodeLib = (function(){
     else { anchorX=w/2; textAlign="center"; }
     g.textAlign=textAlign;
 
-    g.fillStyle=theme.fg;
+    // Auto text color: pick black or white by sampling what sits behind the text block.
+    var fgColor=theme.fg, accentColor=theme.accent;
+    if(state.autoText){
+      var topY=startY - px*0.85;
+      var lumBehind=avgLuminance(g, marginPx, topY, boxW, blockH);
+      fgColor = lumBehind<130 ? "#ffffff" : "#000000";
+      accentColor = fgColor;
+    }
+
+    g.fillStyle=fgColor;
     g.font=fontString(px);
     var y=startY;
     lines.forEach(function(l){ g.fillText(l, anchorX, y); y+=lineH; });
@@ -979,7 +1053,7 @@ var QRCodeLib = (function(){
       if(textAlign==="left"){ rx0=anchorX; rx1=anchorX+ruleLen; }
       else if(textAlign==="right"){ rx0=anchorX-ruleLen; rx1=anchorX; }
       else { rx0=anchorX-ruleLen/2; rx1=anchorX+ruleLen/2; }
-      g.strokeStyle=theme.accent;
+      g.strokeStyle=accentColor;
       g.lineWidth=Math.max(2,Math.round(px*0.045));
       g.beginPath(); g.moveTo(rx0, ruleY); g.lineTo(rx1, ruleY); g.stroke();
       y += px*0.5;
@@ -988,7 +1062,7 @@ var QRCodeLib = (function(){
     if(footRaw){
       var footPx = Math.max(14, Math.round(px*0.34));
       g.font = (state.style==="bold"?"700":"400")+" "+footPx+"px "+FONTS[state.font];
-      g.fillStyle=theme.accent;
+      g.fillStyle=accentColor;
       var fy = (state.vpos==="bottom") ? (h - marginPx - footPx*0.2) : (y + footPx*1.1);
       g.fillText(state.style==="upper"?footRaw.toUpperCase():footRaw, anchorX, fy);
     }
@@ -1026,12 +1100,15 @@ var QRCodeLib = (function(){
       g.strokeRect(inset,inset,w-inset*2,h-inset*2);
     }
 
+    // Safe-zone guide is a preview aid only — never baked into an export.
+    if(opts && opts.guide) drawSafeZone(g,w,h);
+
     return {w:w, h:h, qrAttempted:qrAttempted, qrOk:qrOk};
   }
 
   // Live preview
   function render(){
-    var res = paint(canvas, $("#mainText").value, $("#footText").value);
+    var res = paint(canvas, $("#mainText").value, $("#footText").value, {guide:state.safeZone});
     $("#dimsLabel").textContent = "Canvas "+res.w+" × "+res.h+" px · "+(res.w/res.h).toFixed(2)+" aspect";
     var qrState=$("#qrState");
     if(res.qrAttempted && !res.qrOk) qrState.textContent="URL too long for a clean code";
@@ -1075,7 +1152,7 @@ var QRCodeLib = (function(){
     render();
   });
 
-  ["borderChk","ruleChk","ditherChk"].forEach(function(id){
+  ["borderChk","ruleChk","ditherChk","autoTextChk","safeZoneChk"].forEach(function(id){
     $("#"+id).addEventListener("change",function(e){ state[id.replace("Chk","")]=e.target.checked; render(); });
   });
 
@@ -1124,15 +1201,18 @@ var QRCodeLib = (function(){
   }
 
   $("#downloadBtn").addEventListener("click",function(){
-    render();
+    // Paint a clean copy (no safe-zone guide) for the actual export, then restore the preview.
+    paint(canvas, $("#mainText").value, $("#footText").value, {guide:false});
     downloadCanvas(canvas, filename());
+    render();
   });
 
   // Reliable fallback for sandboxed contexts that block programmatic downloads
   $("#openBtn").addEventListener("click",function(){
-    render();
+    paint(canvas, $("#mainText").value, $("#footText").value, {guide:false});
     var url;
-    try{ url = canvas.toDataURL("image/png"); }catch(err){ alert("Could not render the image."); return; }
+    try{ url = canvas.toDataURL("image/png"); }catch(err){ render(); alert("Could not render the image."); return; }
+    render();
     var win = window.open("");
     if(win && win.document){
       win.document.write('<!doctype html><title>'+filename()+'</title>'+
@@ -1176,6 +1256,21 @@ var QRCodeLib = (function(){
     }catch(e){}
   }
 
+  // Produce a clean standalone copy: strip host-injected cruft that would break the file elsewhere.
+  function buildCleanExport(){
+    var html = APP_SNAPSHOT;
+    // A leftover CSP meta blocks ALL inline scripts when the file is opened standalone (e.g. iOS file://).
+    html = html.replace(/<meta[^>]*http-equiv=["']?content-security-policy[^>]*>/gi, "");
+    // External scripts (e.g. the injected badge) won't resolve off-host; keep our own inline scripts.
+    html = html.replace(/<script[^>]+\bsrc=[^>]*><\/script>/gi, "");
+    html = html.replace(/<script[^>]+\bsrc=[^>]*\/>/gi, "");
+    //  would rewrite relative paths; nonces are meaningless once the CSP is gone.
+    html = html.replace(/]*>/gi, "");
+    html = html.replace(/\snonce=["'][^"']*["']/gi, "");
+    if(!/^<!doctype/i.test(html)) html = "<!DOCTYPE html>\n" + html;
+    return html;
+  }
+
   // Deliver the full HTML for download in a normal (non-sandboxed) window, with fallbacks.
   function deliverApp(html){
     var win=null;
@@ -1188,14 +1283,18 @@ var QRCodeLib = (function(){
         '<title>Save E Ink Wallpaper Studio</title>'+
         '<body style="font-family:-apple-system,system-ui,Helvetica,sans-serif;max-width:640px;margin:0 auto;padding:32px 22px 60px;color:#111;line-height:1.5">'+
         '<h2 style="font-family:Georgia,serif;margin:0 0 6px">Save the app</h2>'+
-        '<p style="color:#555;margin:0 0 18px">Download <code>eink-wallpaper-studio.html</code>, then AirDrop it to your iPhone (open in Safari) or upload it to GitHub Pages and Add to Home Screen.</p>'+
+        '<p style="color:#555;margin:0 0 18px">Click to download <code>eink-wallpaper-studio.html</code>. To use it on an iPhone, upload it to GitHub Pages (rename it <code>index.html</code>) and open that link in Safari — tapping the file in the iOS Files app only previews it and won\'t run the tool.</p>'+
         (b64 ? '<p><a id="dl" download="eink-wallpaper-studio.html" href="data:text/html;charset=utf-8;base64,'+b64+'" '+
           'style="display:inline-block;background:#c2410c;color:#fff;padding:13px 22px;border-radius:9px;text-decoration:none;font-weight:700">Download the app file</a></p>'+
-          '<p style="color:#888;font-size:13px">On iPhone: long-press the button and choose “Download Linked File.” If that doesn\'t work, copy everything below into a file named <code>index.html</code>.</p>' : '')+
-        '<textarea readonly style="width:100%;height:280px;font-family:ui-monospace,Menlo,monospace;font-size:11px;border:1px solid #ddd;border-radius:8px;padding:10px"></textarea>'+
+          '<p style="color:#888;font-size:13px">If the button doesn\'t save, right-click it and choose “Save Link As,” or copy everything below into a file named <code>index.html</code>.</p>' : '')+
+        '<textarea id="srcbox" readonly style="width:100%;height:280px;font-family:ui-monospace,Menlo,monospace;font-size:11px;border:1px solid #ddd;border-radius:8px;padding:10px"></textarea>'+
+        '<scr'+'ipt>(function(){var a=document.getElementById("dl");var ta=document.getElementById("srcbox");if(!a||!ta)return;'+
+        'a.addEventListener("click",function(e){try{var blob=new Blob([ta.value],{type:"text/html"});var u=URL.createObjectURL(blob);'+
+        'var b=document.createElement("a");b.href=u;b.download="eink-wallpaper-studio.html";document.body.appendChild(b);b.click();'+
+        'setTimeout(function(){b.remove();URL.revokeObjectURL(u);},600);e.preventDefault();}catch(err){}});})();<\/scr'+'ipt>'+
         '</body>');
       doc.close();
-      var ta=doc.querySelector("textarea"); if(ta) ta.value=html;
+      var ta=doc.querySelector("#srcbox"); if(ta) ta.value=html;
       return;
     }
     // Pop-up blocked: try a direct blob download in-page.
@@ -1209,8 +1308,8 @@ var QRCodeLib = (function(){
   }
   $("#saveAppBtn").addEventListener("click",function(){
     // Synchronous so the new window counts as a user gesture — mobile browsers block async pop-ups.
-    // APP_SNAPSHOT was captured before any DOM mutation, so it matches the on-disk file.
-    deliverApp(APP_SNAPSHOT);
+    // buildCleanExport() strips any host-injected CSP/badge so the file runs standalone on iOS.
+    deliverApp(buildCleanExport());
   });
 
   // ---------- Custom font ----------
@@ -1326,6 +1425,7 @@ var QRCodeLib = (function(){
       border:state.border, rule:state.rule, dither:state.dither,
       qrpos:state.qrpos, qrsize:state.qrsize,
       imgFit:state.imgFit, imgMode:state.imgMode, imgBright:state.imgBright, imgContrast:state.imgContrast, imgFade:state.imgFade,
+      autoText:state.autoText, safeZone:state.safeZone,
       customW:$("#customW").value, customH:$("#customH").value,
       mainText:$("#mainText").value, footText:$("#footText").value,
       qrUrl:$("#qrUrl").value, qrCaption:$("#qrCaption").value
@@ -1346,6 +1446,8 @@ var QRCodeLib = (function(){
     if(s.imgBright!=null) state.imgBright=+s.imgBright;
     if(s.imgContrast!=null) state.imgContrast=+s.imgContrast;
     if(s.imgFade!=null) state.imgFade=+s.imgFade;
+    if(s.autoText!=null) state.autoText=!!s.autoText;
+    if(s.safeZone!=null) state.safeZone=!!s.safeZone;
     imgCache={canvas:null,key:""};
     if(s.presetIdx!=null && PRESETS[+s.presetIdx]) state.presetIdx=+s.presetIdx;
 
@@ -1368,6 +1470,8 @@ var QRCodeLib = (function(){
     $("#borderChk").checked=state.border;
     $("#ruleChk").checked=state.rule;
     $("#ditherChk").checked=state.dither;
+    $("#autoTextChk").checked=state.autoText;
+    $("#safeZoneChk").checked=state.safeZone;
 
     setSeg("#fontSeg","font","font",state.font);
     setSeg("#styleSeg","style","style",state.style);
