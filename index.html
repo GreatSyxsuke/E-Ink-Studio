@@ -201,8 +201,11 @@ stay hungry.</textarea>
             <span class="field-label">Look</span>
             <div class="seg" id="imgModeSeg">
               <button data-imgmode="grey" class="active">Greyscale</button>
+              <button data-imgmode="grey16">16-level</button>
+              <button data-imgmode="grey4">4-level</button>
               <button data-imgmode="dither">Floyd</button>
               <button data-imgmode="atkinson">Atkinson</button>
+              <button data-imgmode="bayer">Bayer</button>
               <button data-imgmode="twotone">Two-tone</button>
             </div>
           </label>
@@ -213,6 +216,14 @@ stay hungry.</textarea>
           <label class="field">
             <span class="field-label">Contrast</span>
             <div class="range-row"><input type="range" id="imgContrastRange" min="-100" max="100" value="0"><span class="range-val" id="imgContrastVal">0</span></div>
+          </label>
+          <label class="field">
+            <span class="field-label">Gamma</span>
+            <div class="range-row"><input type="range" id="imgGammaRange" min="50" max="250" value="100"><span class="range-val" id="imgGammaVal">1.00</span></div>
+          </label>
+          <label class="field">
+            <span class="field-label">Sharpen</span>
+            <div class="range-row"><input type="range" id="imgSharpenRange" min="0" max="100" value="0"><span class="range-val" id="imgSharpenVal">0</span></div>
           </label>
           <label class="field">
             <span class="field-label">Fade behind text</span>
@@ -776,9 +787,17 @@ var QRCodeLib = (function(){
     border:false, rule:true, dither:false,
     qrpos:"none", qrsize:22,
     imgFit:"cover", imgMode:"grey", imgBright:0, imgContrast:0, imgFade:0,
+    imgGamma:100, imgSharpen:0,
     autoText:false, safeZone:false
   };
   var userImage=null, imgToken=0, imgCache={canvas:null,key:""};
+  // 8x8 Bayer threshold matrix (0-63) for ordered dithering
+  var BAYER8=[
+    [0,32,8,40,2,34,10,42],[48,16,56,24,50,18,58,26],
+    [12,44,4,36,14,46,6,38],[60,28,52,20,62,30,54,22],
+    [3,35,11,43,1,33,9,41],[51,19,59,27,49,17,57,25],
+    [15,47,7,39,13,45,5,37],[63,31,55,23,61,29,53,21]
+  ];
 
   var $ = function(s){ return document.querySelector(s); };
   var canvas = $("#preview");
@@ -864,6 +883,25 @@ var QRCodeLib = (function(){
       v=factor*(v-128)+128+bright;
       lum[px]=v;
     }
+    // Gamma (via a 256-entry lookup on clamped tones)
+    if(state.imgGamma!==100){
+      var gv=state.imgGamma/100, glut=new Float32Array(256);
+      for(var t=0;t<256;t++) glut[t]=255*Math.pow(t/255,gv);
+      for(var gk=0;gk<lum.length;gk++){ var gvv=lum[gk]; gvv=gvv<0?0:(gvv>255?255:gvv); lum[gk]=glut[Math.round(gvv)]; }
+    }
+    // Sharpen (unsharp mask against a 3x3 box blur), applied to continuous tones before quantizing
+    if(state.imgSharpen>0){
+      var amt=state.imgSharpen/100*1.4;
+      var src=new Float32Array(lum);
+      for(var syy=0;syy<H;syy++){
+        for(var sxx=0;sxx<W;sxx++){
+          var si=syy*W+sxx, ssum=0, sn=0;
+          for(var ddy=-1;ddy<=1;ddy++){ var ny=syy+ddy; if(ny<0||ny>=H) continue;
+            for(var ddx=-1;ddx<=1;ddx++){ var nx=sxx+ddx; if(nx<0||nx>=W) continue; ssum+=src[ny*W+nx]; sn++; } }
+          lum[si]=src[si]+amt*(src[si]-ssum/sn);
+        }
+      }
+    }
     if(state.imgMode==="dither"){
       for(var y=0;y<H;y++){
         for(var x=0;x<W;x++){
@@ -899,6 +937,14 @@ var QRCodeLib = (function(){
           if(y+2<H) lum[idx+2*W]+=e;
         }
       }
+    } else if(state.imgMode==="bayer"){
+      // Ordered dithering — 1-bit via the 8x8 Bayer threshold map, aligned to the canvas grid
+      for(var by=0;by<H;by++){ var ay=(y0+by)&7;
+        for(var bx=0;bx<W;bx++){ var bi=by*W+bx; var th=(BAYER8[ay][(x0+bx)&7]+0.5)/64*255; lum[bi]= lum[bi]>th?255:0; } }
+    } else if(state.imgMode==="grey16" || state.imgMode==="grey4"){
+      // Posterize to evenly spaced grey levels (no diffusion) — matches true e-ink grey depths
+      var N=state.imgMode==="grey16"?15:3;
+      for(var qk=0;qk<lum.length;qk++){ var qv=lum[qk]; if(qv<0)qv=0; if(qv>255)qv=255; lum[qk]=Math.round(qv/255*N)/N*255; }
     } else if(state.imgMode==="twotone"){
       for(var k=0;k<lum.length;k++) lum[k]=lum[k]<128?0:255;
     }
@@ -914,7 +960,7 @@ var QRCodeLib = (function(){
     if(!userImage) return null;
     var iw=userImage.naturalWidth||userImage.width, ih=userImage.naturalHeight||userImage.height;
     if(!iw||!ih) return null;
-    var key=[imgToken,w,h,state.imgFit,state.imgMode,state.imgBright,state.imgContrast].join("|");
+    var key=[imgToken,w,h,state.imgFit,state.imgMode,state.imgBright,state.imgContrast,state.imgGamma,state.imgSharpen].join("|");
     if(imgCache.canvas && imgCache.key===key) return imgCache.canvas;
     var oc=document.createElement("canvas"); oc.width=w; oc.height=h;
     var og=oc.getContext("2d");
@@ -1186,6 +1232,8 @@ var QRCodeLib = (function(){
   });
   $("#imgBrightRange").addEventListener("input",function(e){ state.imgBright=+e.target.value; $("#imgBrightVal").textContent=e.target.value; render(); });
   $("#imgContrastRange").addEventListener("input",function(e){ state.imgContrast=+e.target.value; $("#imgContrastVal").textContent=e.target.value; render(); });
+  $("#imgGammaRange").addEventListener("input",function(e){ state.imgGamma=+e.target.value; $("#imgGammaVal").textContent=(e.target.value/100).toFixed(2); render(); });
+  $("#imgSharpenRange").addEventListener("input",function(e){ state.imgSharpen=+e.target.value; $("#imgSharpenVal").textContent=e.target.value; render(); });
   $("#imgFadeRange").addEventListener("input",function(e){ state.imgFade=+e.target.value; $("#imgFadeVal").textContent=e.target.value+"%"; render(); });
 
   function filename(){ var d=currentDims(); return "eink-wallpaper-"+d.w+"x"+d.h+".png"; }
@@ -1425,6 +1473,7 @@ var QRCodeLib = (function(){
       border:state.border, rule:state.rule, dither:state.dither,
       qrpos:state.qrpos, qrsize:state.qrsize,
       imgFit:state.imgFit, imgMode:state.imgMode, imgBright:state.imgBright, imgContrast:state.imgContrast, imgFade:state.imgFade,
+      imgGamma:state.imgGamma, imgSharpen:state.imgSharpen,
       autoText:state.autoText, safeZone:state.safeZone,
       customW:$("#customW").value, customH:$("#customH").value,
       mainText:$("#mainText").value, footText:$("#footText").value,
@@ -1446,6 +1495,8 @@ var QRCodeLib = (function(){
     if(s.imgBright!=null) state.imgBright=+s.imgBright;
     if(s.imgContrast!=null) state.imgContrast=+s.imgContrast;
     if(s.imgFade!=null) state.imgFade=+s.imgFade;
+    if(s.imgGamma!=null) state.imgGamma=+s.imgGamma;
+    if(s.imgSharpen!=null) state.imgSharpen=+s.imgSharpen;
     if(s.autoText!=null) state.autoText=!!s.autoText;
     if(s.safeZone!=null) state.safeZone=!!s.safeZone;
     imgCache={canvas:null,key:""};
@@ -1465,6 +1516,8 @@ var QRCodeLib = (function(){
     $("#qrSizeRange").value=state.qrsize; $("#qrSizeVal").textContent=state.qrsize+"%";
     $("#imgBrightRange").value=state.imgBright; $("#imgBrightVal").textContent=state.imgBright;
     $("#imgContrastRange").value=state.imgContrast; $("#imgContrastVal").textContent=state.imgContrast;
+    $("#imgGammaRange").value=state.imgGamma; $("#imgGammaVal").textContent=(state.imgGamma/100).toFixed(2);
+    $("#imgSharpenRange").value=state.imgSharpen; $("#imgSharpenVal").textContent=state.imgSharpen;
     $("#imgFadeRange").value=state.imgFade; $("#imgFadeVal").textContent=state.imgFade+"%";
 
     $("#borderChk").checked=state.border;
