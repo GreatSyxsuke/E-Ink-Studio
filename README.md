@@ -6,20 +6,37 @@ Turn text and photos into high-contrast, grayscale wallpapers sized for e-ink de
 
 ## Features
 
-- **Text to wallpaper** — type a quote, word, or mantra with an optional attribution line, auto-fit to the screen.
+- **Text to wallpaper** — type a quote, word, or mantra with an optional attribution line, auto-fit to the screen. Supports **template tokens** (see below) for dates and times.
 - **Device presets** — XTEink X3 / X4 Pro / X4 Classic, reMarkable 2 & Paper Pro, Kindle Paperwhite / Oasis / Scribe, Kobo Clara 2E / Libra 2, Boox Note Air & Tab, Supernote A5 X, phone lock screen, square, or a custom pixel size. Exports at true device resolution.
 - **Typography** — serif, geometric, or monospace type stacks, plus upload your own font (.ttf/.otf/.woff/.woff2). Regular / bold / UPPERCASE and a size control.
 - **Layout** — left/center/right alignment, top/middle/bottom placement, adjustable margin.
 - **Photos** — drop in an image and convert it to grayscale, sized to the exact preset:
-  - Fit: **Cover** or **Contain**
-  - Look: **Greyscale**, **16-level**, **4-level**, **Floyd–Steinberg**, **Atkinson**, **Bayer** (ordered), **Two-tone** (1-bit)
-  - Brightness, contrast, gamma, and sharpen sliders
+  - Fit: **Cover** or **Contain**, with **zoom** and **horizontal/vertical pan** to reposition and crop
+  - Look: **Greyscale**, **16-level**, **4-level**, **Floyd–Steinberg**, **Atkinson**, **Bayer** (ordered), **Halftone** (dot grid), **Two-tone** (1-bit)
+  - Tone: brightness, contrast, gamma, sharpen, **black-point / white-point levels**, and an **adjustable 1-bit threshold** (also biases the dithered modes)
+  - Effects: **vignette** and **rounded corners**
   - Fade behind text for legible overlays
 - **QR codes** — turn any URL into a scannable code (self-contained generator, no external library), place it in any corner with an optional caption. Always rendered black-on-white so it scans on any theme.
-- **Finish** — Paper / Inverted / Slate themes, hairline border, accent rule, dither texture, **auto text color** (samples the photo behind the text and picks black or white for contrast), and a **lock-screen safe-zone guide** (preview-only markers for the iPhone clock, widgets, and home bar).
+- **Finish** — Paper / Inverted / Slate themes, hairline border, accent rule, dither texture, **paper-grain texture**, **auto text color** (samples the photo behind the text and picks black or white for contrast), and a **lock-screen safe-zone guide** (preview-only markers for the iPhone clock, widgets, and home bar).
 - **Batch export** — write multiple wallpapers separated by a line of three dashes and generate them all at once.
 - **Saved looks** — store your full setup in the browser, and copy a portable settings code to move a look between devices.
 - **Export** — download a PNG, open it in a new tab (for iOS "Save to Photos"), or export the whole tool as a single HTML file.
+
+## Template tokens
+
+Type any of these into the main text, attribution, or QR caption and they're filled in when you generate:
+
+| Token | Example |
+| --- | --- |
+| `{date}` | September 27, 2026 |
+| `{shortdate}` | 9/27/2026 |
+| `{weekday}` | Sunday |
+| `{day}` | 27 |
+| `{month}` | September |
+| `{year}` | 2026 |
+| `{time}` | 9:49 PM |
+
+Tokens are resolved at the moment you export, producing a static image (great for a dated "daily" wallpaper you regenerate — not a self-updating clock).
 
 ## Usage
 
@@ -40,7 +57,7 @@ This is a single `index.html` file — host it anywhere static.
 ## Tech notes
 
 - Vanilla HTML/CSS/JavaScript with the Canvas API — no frameworks, no build tooling.
-- Dithering, gamma, and sharpening run as pixel passes on the canvas; results are cached so only changed settings trigger a re-process.
+- Grayscale conversion, levels, gamma, sharpening, vignette, dithering (Floyd–Steinberg, Atkinson, Bayer, halftone), and quantization run as pixel passes on the canvas; results are cached so only changed settings trigger a re-process.
 - The QR generator is a self-contained implementation (byte mode, error-correction level M, auto version selection up to v10), based on `qrcode-generator` by Kazuhiko Arase (MIT).
 - Works fully offline once loaded — every asset is inline.
 
