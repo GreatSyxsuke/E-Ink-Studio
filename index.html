@@ -179,6 +179,7 @@ stay hungry.</textarea>
           <span class="field-label">Attribution / footer (optional)</span>
           <input type="text" id="footText" placeholder="— someone worth quoting" value="— Whole Earth Catalog">
         </label>
+        <p class="hint">Tokens filled in when you generate: <code>{date}</code> <code>{weekday}</code> <code>{day}</code> <code>{month}</code> <code>{year}</code> <code>{time}</code></p>
       </div>
 
       <div class="card">
@@ -198,6 +199,18 @@ stay hungry.</textarea>
             </div>
           </label>
           <label class="field">
+            <span class="field-label">Zoom</span>
+            <div class="range-row"><input type="range" id="imgZoomRange" min="100" max="300" value="100"><span class="range-val" id="imgZoomVal">1.0x</span></div>
+          </label>
+          <label class="field">
+            <span class="field-label">Pan horizontal</span>
+            <div class="range-row"><input type="range" id="imgPanXRange" min="-100" max="100" value="0"><span class="range-val" id="imgPanXVal">0</span></div>
+          </label>
+          <label class="field">
+            <span class="field-label">Pan vertical</span>
+            <div class="range-row"><input type="range" id="imgPanYRange" min="-100" max="100" value="0"><span class="range-val" id="imgPanYVal">0</span></div>
+          </label>
+          <label class="field">
             <span class="field-label">Look</span>
             <div class="seg" id="imgModeSeg">
               <button data-imgmode="grey" class="active">Greyscale</button>
@@ -206,6 +219,7 @@ stay hungry.</textarea>
               <button data-imgmode="dither">Floyd</button>
               <button data-imgmode="atkinson">Atkinson</button>
               <button data-imgmode="bayer">Bayer</button>
+              <button data-imgmode="halftone">Halftone</button>
               <button data-imgmode="twotone">Two-tone</button>
             </div>
           </label>
@@ -224,6 +238,26 @@ stay hungry.</textarea>
           <label class="field">
             <span class="field-label">Sharpen</span>
             <div class="range-row"><input type="range" id="imgSharpenRange" min="0" max="100" value="0"><span class="range-val" id="imgSharpenVal">0</span></div>
+          </label>
+          <label class="field">
+            <span class="field-label">Black point</span>
+            <div class="range-row"><input type="range" id="imgBlackRange" min="0" max="90" value="0"><span class="range-val" id="imgBlackVal">0</span></div>
+          </label>
+          <label class="field">
+            <span class="field-label">White point</span>
+            <div class="range-row"><input type="range" id="imgWhiteRange" min="10" max="100" value="100"><span class="range-val" id="imgWhiteVal">100</span></div>
+          </label>
+          <label class="field">
+            <span class="field-label">Two-tone threshold</span>
+            <div class="range-row"><input type="range" id="imgThresholdRange" min="5" max="95" value="50"><span class="range-val" id="imgThresholdVal">50</span></div>
+          </label>
+          <label class="field">
+            <span class="field-label">Vignette</span>
+            <div class="range-row"><input type="range" id="imgVignetteRange" min="0" max="100" value="0"><span class="range-val" id="imgVignetteVal">0</span></div>
+          </label>
+          <label class="field">
+            <span class="field-label">Rounded corners</span>
+            <div class="range-row"><input type="range" id="imgRoundRange" min="0" max="100" value="0"><span class="range-val" id="imgRoundVal">0</span></div>
           </label>
           <label class="field">
             <span class="field-label">Fade behind text</span>
@@ -391,6 +425,10 @@ anywhere."></textarea>
         </label>
         <label class="check">
           <input type="checkbox" id="safeZoneChk"> Lock-screen safe-zone guide (preview only)
+        </label>
+        <label class="field" style="margin-top:12px;margin-bottom:0;">
+          <span class="field-label">Paper grain</span>
+          <div class="range-row"><input type="range" id="paperGrainRange" min="0" max="100" value="0"><span class="range-val" id="paperGrainVal">0</span></div>
         </label>
       </div>
 
@@ -788,6 +826,9 @@ var QRCodeLib = (function(){
     qrpos:"none", qrsize:22,
     imgFit:"cover", imgMode:"grey", imgBright:0, imgContrast:0, imgFade:0,
     imgGamma:100, imgSharpen:0,
+    imgZoom:100, imgPanX:0, imgPanY:0,
+    imgBlack:0, imgWhite:100, imgThreshold:50, imgVignette:0, imgRound:0,
+    paperGrain:0,
     autoText:false, safeZone:false
   };
   var userImage=null, imgToken=0, imgCache={canvas:null,key:""};
@@ -889,6 +930,13 @@ var QRCodeLib = (function(){
       for(var t=0;t<256;t++) glut[t]=255*Math.pow(t/255,gv);
       for(var gk=0;gk<lum.length;gk++){ var gvv=lum[gk]; gvv=gvv<0?0:(gvv>255?255:gvv); lum[gk]=glut[Math.round(gvv)]; }
     }
+    // Levels: stretch the [black, white] input range out to full 0-255
+    if(state.imgBlack>0 || state.imgWhite<100){
+      var bp=state.imgBlack/100*255, wp=state.imgWhite/100*255;
+      if(wp<=bp) wp=bp+1;
+      var lscale=255/(wp-bp);
+      for(var lk=0;lk<lum.length;lk++) lum[lk]=(lum[lk]-bp)*lscale;
+    }
     // Sharpen (unsharp mask against a 3x3 box blur), applied to continuous tones before quantizing
     if(state.imgSharpen>0){
       var amt=state.imgSharpen/100*1.4;
@@ -901,6 +949,32 @@ var QRCodeLib = (function(){
           lum[si]=src[si]+amt*(src[si]-ssum/sn);
         }
       }
+    }
+    // Vignette: darken toward the edges
+    if(state.imgVignette>0){
+      var vstr=state.imgVignette/100, vcx=W/2, vcy=H/2, vmax=Math.sqrt(vcx*vcx+vcy*vcy);
+      for(var vy=0;vy<H;vy++){ for(var vx=0;vx<W;vx++){ var vi=vy*W+vx; var vdx=vx-vcx, vdy=vy-vcy; var vd=Math.sqrt(vdx*vdx+vdy*vdy)/vmax; lum[vi]*=(1 - vstr*Math.pow(vd,2.2)); } }
+    }
+    // 1-bit cutoff and bias
+    var cutoff=state.imgThreshold/100*255;
+    if(state.imgThreshold!==50 && (state.imgMode==="dither"||state.imgMode==="atkinson"||state.imgMode==="bayer")){
+      var bias=128-cutoff;
+      for(var bk=0;bk<lum.length;bk++) lum[bk]+=bias;
+    }
+    // Halftone: variable-size dots on a grid (drawn directly, then done)
+    if(state.imgMode==="halftone"){
+      var cell=Math.max(4,Math.round(Math.min(w,h)/110));
+      g.fillStyle="#ffffff"; g.fillRect(x0,y0,W,H);
+      g.fillStyle="#000000";
+      for(var hy=0;hy<H;hy+=cell){
+        for(var hx=0;hx<W;hx+=cell){
+          var s2=0,c2=0, yend=Math.min(hy+cell,H), xend=Math.min(hx+cell,W);
+          for(var yy2=hy;yy2<yend;yy2++){ for(var xx2=hx;xx2<xend;xx2++){ var lv=lum[yy2*W+xx2]; s2+=(lv<0?0:(lv>255?255:lv)); c2++; } }
+          var avg2=c2?s2/c2:255, dark=1-avg2/255, rad=Math.sqrt(dark)*(cell/2)*1.15;
+          if(rad>0.35){ g.beginPath(); g.arc(x0+hx+cell/2, y0+hy+cell/2, rad, 0, Math.PI*2); g.fill(); }
+        }
+      }
+      return;
     }
     if(state.imgMode==="dither"){
       for(var y=0;y<H;y++){
@@ -946,7 +1020,7 @@ var QRCodeLib = (function(){
       var N=state.imgMode==="grey16"?15:3;
       for(var qk=0;qk<lum.length;qk++){ var qv=lum[qk]; if(qv<0)qv=0; if(qv>255)qv=255; lum[qk]=Math.round(qv/255*N)/N*255; }
     } else if(state.imgMode==="twotone"){
-      for(var k=0;k<lum.length;k++) lum[k]=lum[k]<128?0:255;
+      for(var k=0;k<lum.length;k++) lum[k]=lum[k]<cutoff?0:255;
     }
     for(var p=0,px=0;p<d.length;p+=4,px++){
       var val=lum[px]; val=val<0?0:(val>255?255:val);
@@ -960,16 +1034,72 @@ var QRCodeLib = (function(){
     if(!userImage) return null;
     var iw=userImage.naturalWidth||userImage.width, ih=userImage.naturalHeight||userImage.height;
     if(!iw||!ih) return null;
-    var key=[imgToken,w,h,state.imgFit,state.imgMode,state.imgBright,state.imgContrast,state.imgGamma,state.imgSharpen].join("|");
+    var key=[imgToken,w,h,state.imgFit,state.imgMode,state.imgBright,state.imgContrast,state.imgGamma,state.imgSharpen,
+      state.imgZoom,state.imgPanX,state.imgPanY,state.imgBlack,state.imgWhite,state.imgThreshold,state.imgVignette,state.imgRound].join("|");
     if(imgCache.canvas && imgCache.key===key) return imgCache.canvas;
     var oc=document.createElement("canvas"); oc.width=w; oc.height=h;
     var og=oc.getContext("2d");
-    var scale = state.imgFit==="cover" ? Math.max(w/iw,h/ih) : Math.min(w/iw,h/ih);
-    var dw=iw*scale, dh=ih*scale, dx=(w-dw)/2, dy=(h-dh)/2;
+    var base = state.imgFit==="cover" ? Math.max(w/iw,h/ih) : Math.min(w/iw,h/ih);
+    var scale = base * (state.imgZoom/100);
+    var dw=iw*scale, dh=ih*scale;
+    var dx=(w-dw)/2 + (state.imgPanX/100)*Math.max(0,(dw-w)/2);
+    var dy=(h-dh)/2 + (state.imgPanY/100)*Math.max(0,(dh-h)/2);
     og.drawImage(userImage,dx,dy,dw,dh);
     processRegion(og,dx,dy,dw,dh,w,h);
+    // Rounded corners: mask the drawn image area to a rounded rect
+    if(state.imgRound>0){
+      var rr=state.imgRound/100 * Math.min(w,h)/2;
+      var rx0=Math.max(0,dx), ry0=Math.max(0,dy), rx1=Math.min(w,dx+dw), ry1=Math.min(h,dy+dh);
+      og.globalCompositeOperation="destination-in";
+      og.fillStyle="#000";
+      roundRectPath(og, rx0, ry0, rx1-rx0, ry1-ry0, rr); og.fill();
+      og.globalCompositeOperation="source-over";
+    }
     imgCache={canvas:oc,key:key};
     return oc;
+  }
+
+  // Replace {date}/{time}/etc. tokens with the current date/time at render.
+  function applyTokens(str){
+    if(!str || str.indexOf("{")<0) return str;
+    var d=new Date();
+    var months=["January","February","March","April","May","June","July","August","September","October","November","December"];
+    var days=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+    var hh=d.getHours(), mm=d.getMinutes();
+    var ampm=hh>=12?"PM":"AM"; var h12=hh%12; if(h12===0) h12=12;
+    var map={
+      "{date}":months[d.getMonth()]+" "+d.getDate()+", "+d.getFullYear(),
+      "{shortdate}":(d.getMonth()+1)+"/"+d.getDate()+"/"+d.getFullYear(),
+      "{weekday}":days[d.getDay()],
+      "{day}":String(d.getDate()),
+      "{month}":months[d.getMonth()],
+      "{year}":String(d.getFullYear()),
+      "{time}":h12+":"+(mm<10?"0"+mm:mm)+" "+ampm
+    };
+    return str.replace(/\{(date|shortdate|weekday|day|month|year|time)\}/g,function(mt){ return map[mt]!=null?map[mt]:mt; });
+  }
+
+  function roundRectPath(g,x,y,w,h,r){
+    r=Math.min(r,w/2,h/2);
+    g.beginPath();
+    g.moveTo(x+r,y);
+    g.arcTo(x+w,y,x+w,y+h,r);
+    g.arcTo(x+w,y+h,x,y+h,r);
+    g.arcTo(x,y+h,x,y,r);
+    g.arcTo(x,y,x+w,y,r);
+    g.closePath();
+  }
+
+  // Cached paper-grain noise, tiled as a pattern at low opacity.
+  var _noiseCanvas=null;
+  function getGrainPattern(g){
+    if(!_noiseCanvas){
+      _noiseCanvas=document.createElement("canvas"); _noiseCanvas.width=_noiseCanvas.height=120;
+      var ng=_noiseCanvas.getContext("2d"), id=ng.createImageData(120,120), dd=id.data;
+      for(var i=0;i<dd.length;i+=4){ var v=Math.floor(Math.random()*255); dd[i]=dd[i+1]=dd[i+2]=v; dd[i+3]=Math.random()<0.5?90:0; }
+      ng.putImageData(id,0,0);
+    }
+    try{ return g.createPattern(_noiseCanvas,"repeat"); }catch(e){ return null; }
   }
 
   // Average luminance (0-255) of a canvas region; samples sparsely for speed.
@@ -1040,16 +1170,22 @@ var QRCodeLib = (function(){
       }
     }
 
+    // ----- PAPER GRAIN -----
+    if(state.paperGrain>0){
+      var gp=getGrainPattern(g);
+      if(gp){ g.save(); g.globalAlpha=state.paperGrain/100*0.20; g.fillStyle=gp; g.fillRect(0,0,w,h); g.globalAlpha=1; g.restore(); }
+    }
+
     var marginPx = Math.round(Math.min(w,h) * (state.margin/100));
     var boxW = w - marginPx*2;
     var basePx = Math.round((state.size/1000) * Math.min(w,h) * 1.8);
 
-    var mainRaw = (mainInput||"").replace(/\s+$/,"");
+    var mainRaw = applyTokens(mainInput||"").replace(/\s+$/,"");
     if(state.style==="upper") mainRaw = mainRaw.toUpperCase();
 
     g.textBaseline="alphabetic";
     var px=basePx, lines=[], lineH=0, totalH=0;
-    var footRaw = (footInput||"").trim();
+    var footRaw = applyTokens(footInput||"").trim();
     var footReserve = footRaw ? 1 : 0;
 
     for(var guard=0; guard<40; guard++){
@@ -1119,7 +1255,7 @@ var QRCodeLib = (function(){
     var qrOk = true;
     if(qrAttempted){
       var qsize = Math.round(Math.min(w,h) * (state.qrsize/100));
-      var capRaw = ($("#qrCaption").value||"").trim();
+      var capRaw = applyTokens($("#qrCaption").value||"").trim();
       var capPx = capRaw ? Math.max(12, Math.round(qsize*0.09)) : 0;
       var capGap = capRaw ? Math.round(qsize*0.06) : 0;
       var blockHqr = qsize + capGap + capPx;
@@ -1234,6 +1370,15 @@ var QRCodeLib = (function(){
   $("#imgContrastRange").addEventListener("input",function(e){ state.imgContrast=+e.target.value; $("#imgContrastVal").textContent=e.target.value; render(); });
   $("#imgGammaRange").addEventListener("input",function(e){ state.imgGamma=+e.target.value; $("#imgGammaVal").textContent=(e.target.value/100).toFixed(2); render(); });
   $("#imgSharpenRange").addEventListener("input",function(e){ state.imgSharpen=+e.target.value; $("#imgSharpenVal").textContent=e.target.value; render(); });
+  $("#imgZoomRange").addEventListener("input",function(e){ state.imgZoom=+e.target.value; $("#imgZoomVal").textContent=(e.target.value/100).toFixed(1)+"x"; render(); });
+  $("#imgPanXRange").addEventListener("input",function(e){ state.imgPanX=+e.target.value; $("#imgPanXVal").textContent=e.target.value; render(); });
+  $("#imgPanYRange").addEventListener("input",function(e){ state.imgPanY=+e.target.value; $("#imgPanYVal").textContent=e.target.value; render(); });
+  $("#imgBlackRange").addEventListener("input",function(e){ state.imgBlack=+e.target.value; $("#imgBlackVal").textContent=e.target.value; render(); });
+  $("#imgWhiteRange").addEventListener("input",function(e){ state.imgWhite=+e.target.value; $("#imgWhiteVal").textContent=e.target.value; render(); });
+  $("#imgThresholdRange").addEventListener("input",function(e){ state.imgThreshold=+e.target.value; $("#imgThresholdVal").textContent=e.target.value; render(); });
+  $("#imgVignetteRange").addEventListener("input",function(e){ state.imgVignette=+e.target.value; $("#imgVignetteVal").textContent=e.target.value; render(); });
+  $("#imgRoundRange").addEventListener("input",function(e){ state.imgRound=+e.target.value; $("#imgRoundVal").textContent=e.target.value; render(); });
+  $("#paperGrainRange").addEventListener("input",function(e){ state.paperGrain=+e.target.value; $("#paperGrainVal").textContent=e.target.value; render(); });
   $("#imgFadeRange").addEventListener("input",function(e){ state.imgFade=+e.target.value; $("#imgFadeVal").textContent=e.target.value+"%"; render(); });
 
   function filename(){ var d=currentDims(); return "eink-wallpaper-"+d.w+"x"+d.h+".png"; }
@@ -1474,6 +1619,9 @@ var QRCodeLib = (function(){
       qrpos:state.qrpos, qrsize:state.qrsize,
       imgFit:state.imgFit, imgMode:state.imgMode, imgBright:state.imgBright, imgContrast:state.imgContrast, imgFade:state.imgFade,
       imgGamma:state.imgGamma, imgSharpen:state.imgSharpen,
+      imgZoom:state.imgZoom, imgPanX:state.imgPanX, imgPanY:state.imgPanY,
+      imgBlack:state.imgBlack, imgWhite:state.imgWhite, imgThreshold:state.imgThreshold, imgVignette:state.imgVignette, imgRound:state.imgRound,
+      paperGrain:state.paperGrain,
       autoText:state.autoText, safeZone:state.safeZone,
       customW:$("#customW").value, customH:$("#customH").value,
       mainText:$("#mainText").value, footText:$("#footText").value,
@@ -1497,6 +1645,15 @@ var QRCodeLib = (function(){
     if(s.imgFade!=null) state.imgFade=+s.imgFade;
     if(s.imgGamma!=null) state.imgGamma=+s.imgGamma;
     if(s.imgSharpen!=null) state.imgSharpen=+s.imgSharpen;
+    if(s.imgZoom!=null) state.imgZoom=+s.imgZoom;
+    if(s.imgPanX!=null) state.imgPanX=+s.imgPanX;
+    if(s.imgPanY!=null) state.imgPanY=+s.imgPanY;
+    if(s.imgBlack!=null) state.imgBlack=+s.imgBlack;
+    if(s.imgWhite!=null) state.imgWhite=+s.imgWhite;
+    if(s.imgThreshold!=null) state.imgThreshold=+s.imgThreshold;
+    if(s.imgVignette!=null) state.imgVignette=+s.imgVignette;
+    if(s.imgRound!=null) state.imgRound=+s.imgRound;
+    if(s.paperGrain!=null) state.paperGrain=+s.paperGrain;
     if(s.autoText!=null) state.autoText=!!s.autoText;
     if(s.safeZone!=null) state.safeZone=!!s.safeZone;
     imgCache={canvas:null,key:""};
@@ -1518,6 +1675,15 @@ var QRCodeLib = (function(){
     $("#imgContrastRange").value=state.imgContrast; $("#imgContrastVal").textContent=state.imgContrast;
     $("#imgGammaRange").value=state.imgGamma; $("#imgGammaVal").textContent=(state.imgGamma/100).toFixed(2);
     $("#imgSharpenRange").value=state.imgSharpen; $("#imgSharpenVal").textContent=state.imgSharpen;
+    $("#imgZoomRange").value=state.imgZoom; $("#imgZoomVal").textContent=(state.imgZoom/100).toFixed(1)+"x";
+    $("#imgPanXRange").value=state.imgPanX; $("#imgPanXVal").textContent=state.imgPanX;
+    $("#imgPanYRange").value=state.imgPanY; $("#imgPanYVal").textContent=state.imgPanY;
+    $("#imgBlackRange").value=state.imgBlack; $("#imgBlackVal").textContent=state.imgBlack;
+    $("#imgWhiteRange").value=state.imgWhite; $("#imgWhiteVal").textContent=state.imgWhite;
+    $("#imgThresholdRange").value=state.imgThreshold; $("#imgThresholdVal").textContent=state.imgThreshold;
+    $("#imgVignetteRange").value=state.imgVignette; $("#imgVignetteVal").textContent=state.imgVignette;
+    $("#imgRoundRange").value=state.imgRound; $("#imgRoundVal").textContent=state.imgRound;
+    $("#paperGrainRange").value=state.paperGrain; $("#paperGrainVal").textContent=state.paperGrain;
     $("#imgFadeRange").value=state.imgFade; $("#imgFadeVal").textContent=state.imgFade+"%";
 
     $("#borderChk").checked=state.border;
