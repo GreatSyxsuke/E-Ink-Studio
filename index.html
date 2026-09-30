@@ -457,6 +457,16 @@ anywhere."></textarea>
             <option value="bmp8">BMP · 8-bit greyscale (smaller)</option>
           </select>
         </label>
+        <label class="field" style="margin-bottom:10px;">
+          <span class="field-label">E-ink render (match the panel)</span>
+          <select id="einkOut">
+            <option value="off">Off — smooth (device may add grain)</option>
+            <option value="floyd">1-bit · Floyd</option>
+            <option value="atkinson">1-bit · Atkinson</option>
+            <option value="bayer">1-bit · Bayer</option>
+            <option value="grey16">16-level grey</option>
+          </select>
+        </label>
         <button class="btn-primary" id="downloadBtn">Download</button>
         <button class="btn-ghost" id="openBtn">Open image in new tab</button>
         <button class="btn-ghost" id="randomBtn">Surprise me</button>
@@ -838,7 +848,7 @@ var QRCodeLib = (function(){
     imgBlack:0, imgWhite:100, imgThreshold:50, imgVignette:0, imgRound:0,
     paperGrain:0,
     autoText:false, safeZone:false,
-    exportFormat:"png"
+    exportFormat:"png", einkOut:"off"
   };
   var userImage=null, imgToken=0, imgCache={canvas:null,key:""};
   // 8x8 Bayer threshold matrix (0-63) for ordered dithering
@@ -1149,6 +1159,31 @@ var QRCodeLib = (function(){
     g.restore();
   }
 
+  // Quantize/dither the whole composited canvas to the panel's depth, so the device
+  // displays it verbatim instead of adding its own grain. Also makes the preview match.
+  function quantizeCanvas(g, w, h, mode){
+    var img;
+    try{ img=g.getImageData(0,0,w,h); }catch(e){ return; }
+    var data=img.data, n=w*h, lum=new Float32Array(n);
+    for(var p=0,px=0;p<data.length;p+=4,px++){ lum[px]=0.299*data[p]+0.587*data[p+1]+0.114*data[p+2]; }
+    if(mode==="grey16"){
+      for(var k=0;k<n;k++){ var v=lum[k]; if(v<0)v=0; if(v>255)v=255; lum[k]=Math.round(v/255*15)/15*255; }
+    } else if(mode==="bayer"){
+      for(var y=0;y<h;y++){ var ay=y&7; for(var x=0;x<w;x++){ var idx=y*w+x; var th=(BAYER8[ay][x&7]+0.5)/64*255; lum[idx]=lum[idx]>th?255:0; } }
+    } else if(mode==="atkinson"){
+      for(var y=0;y<h;y++){ for(var x=0;x<w;x++){ var idx=y*w+x; var old=lum[idx]; var nw=old<128?0:255; var e=(old-nw)/8; lum[idx]=nw;
+        if(x+1<w)lum[idx+1]+=e; if(x+2<w)lum[idx+2]+=e;
+        if(y+1<h){ if(x>0)lum[idx+w-1]+=e; lum[idx+w]+=e; if(x+1<w)lum[idx+w+1]+=e; }
+        if(y+2<h)lum[idx+2*w]+=e; } }
+    } else { // floyd
+      for(var y=0;y<h;y++){ for(var x=0;x<w;x++){ var idx=y*w+x; var old=lum[idx]; var nw=old<128?0:255; var err=old-nw; lum[idx]=nw;
+        if(x+1<w)lum[idx+1]+=err*7/16;
+        if(y+1<h){ if(x>0)lum[idx+w-1]+=err*3/16; lum[idx+w]+=err*5/16; if(x+1<w)lum[idx+w+1]+=err*1/16; } } }
+    }
+    for(var p2=0,px2=0;p2<data.length;p2+=4,px2++){ var val=lum[px2]; val=val<0?0:(val>255?255:val); data[p2]=data[p2+1]=data[p2+2]=val; }
+    g.putImageData(img,0,0);
+  }
+
   // Paint a full wallpaper onto any canvas using current settings + supplied text.
   function paint(cv, mainInput, footInput, opts){
     var g = cv.getContext("2d");
@@ -1290,6 +1325,9 @@ var QRCodeLib = (function(){
       g.lineWidth=Math.max(2,Math.round(Math.min(w,h)*0.004));
       g.strokeRect(inset,inset,w-inset*2,h-inset*2);
     }
+
+    // E-ink render: quantize the whole image so preview matches the panel and the device won't re-dither.
+    if(state.einkOut && state.einkOut!=="off") quantizeCanvas(g,w,h,state.einkOut);
 
     // Safe-zone guide is a preview aid only — never baked into an export.
     if(opts && opts.guide) drawSafeZone(g,w,h);
@@ -1455,6 +1493,7 @@ var QRCodeLib = (function(){
   }
 
   $("#exportFormat").addEventListener("change",function(e){ state.exportFormat=e.target.value; });
+  $("#einkOut").addEventListener("change",function(e){ state.einkOut=e.target.value; render(); });
   $("#downloadBtn").addEventListener("click",function(){
     // Paint a clean copy (no safe-zone guide) for the actual export, then restore the preview.
     paint(canvas, $("#mainText").value, $("#footText").value, {guide:false});
@@ -1685,7 +1724,7 @@ var QRCodeLib = (function(){
       imgBlack:state.imgBlack, imgWhite:state.imgWhite, imgThreshold:state.imgThreshold, imgVignette:state.imgVignette, imgRound:state.imgRound,
       paperGrain:state.paperGrain,
       autoText:state.autoText, safeZone:state.safeZone,
-      exportFormat:state.exportFormat,
+      exportFormat:state.exportFormat, einkOut:state.einkOut,
       customW:$("#customW").value, customH:$("#customH").value,
       mainText:$("#mainText").value, footText:$("#footText").value,
       qrUrl:$("#qrUrl").value, qrCaption:$("#qrCaption").value
@@ -1720,6 +1759,7 @@ var QRCodeLib = (function(){
     if(s.autoText!=null) state.autoText=!!s.autoText;
     if(s.safeZone!=null) state.safeZone=!!s.safeZone;
     if(s.exportFormat) state.exportFormat=s.exportFormat;
+    if(s.einkOut) state.einkOut=s.einkOut;
     imgCache={canvas:null,key:""};
     if(s.presetIdx!=null && PRESETS[+s.presetIdx]) state.presetIdx=+s.presetIdx;
 
@@ -1756,6 +1796,7 @@ var QRCodeLib = (function(){
     $("#autoTextChk").checked=state.autoText;
     $("#safeZoneChk").checked=state.safeZone;
     $("#exportFormat").value=state.exportFormat;
+    $("#einkOut").value=state.einkOut;
 
     setSeg("#fontSeg","font","font",state.font);
     setSeg("#styleSeg","style","style",state.style);
