@@ -449,10 +449,18 @@ anywhere."></textarea>
       </div>
 
       <div class="card">
-        <button class="btn-primary" id="downloadBtn">Download PNG</button>
+        <label class="field" style="margin-bottom:10px;">
+          <span class="field-label">File format</span>
+          <select id="exportFormat">
+            <option value="png">PNG</option>
+            <option value="bmp24">BMP · 24-bit (e-ink wallpaper)</option>
+            <option value="bmp8">BMP · 8-bit greyscale (smaller)</option>
+          </select>
+        </label>
+        <button class="btn-primary" id="downloadBtn">Download</button>
         <button class="btn-ghost" id="openBtn">Open image in new tab</button>
         <button class="btn-ghost" id="randomBtn">Surprise me</button>
-        <p class="hint" style="text-align:center;">If the download doesn't start, use “Open in new tab,” then long-press / right-click the image to save it.</p>
+        <p class="hint" style="text-align:center;">Many e-ink devices (XTEink included) only accept <strong>24-bit BMP</strong> as a wallpaper, even if they display PNG. If a download doesn't start, use “Open in new tab,” then long-press / right-click to save.</p>
         <button class="btn-ghost" id="saveAppBtn" style="margin-top:14px;">📱 Save this app for your phone</button>
         <p class="hint" style="text-align:center;">Downloads the whole tool as one file. AirDrop it to your iPhone and open in Safari, or upload it to GitHub Pages, then Add to Home Screen.</p>
       </div>
@@ -829,7 +837,8 @@ var QRCodeLib = (function(){
     imgZoom:100, imgPanX:0, imgPanY:0,
     imgBlack:0, imgWhite:100, imgThreshold:50, imgVignette:0, imgRound:0,
     paperGrain:0,
-    autoText:false, safeZone:false
+    autoText:false, safeZone:false,
+    exportFormat:"png"
   };
   var userImage=null, imgToken=0, imgCache={canvas:null,key:""};
   // 8x8 Bayer threshold matrix (0-63) for ordered dithering
@@ -1382,6 +1391,58 @@ var QRCodeLib = (function(){
   $("#imgFadeRange").addEventListener("input",function(e){ state.imgFade=+e.target.value; $("#imgFadeVal").textContent=e.target.value+"%"; render(); });
 
   function filename(){ var d=currentDims(); return "eink-wallpaper-"+d.w+"x"+d.h+".png"; }
+  function filenameFor(fmt){ var d=currentDims(); return "eink-wallpaper-"+d.w+"x"+d.h+"."+(fmt==="png"?"png":"bmp"); }
+
+  // Encode a canvas as an uncompressed 24-bit Windows BMP (max device compatibility).
+  function canvasToBMP24(cv){
+    var w=cv.width, h=cv.height;
+    var data=cv.getContext("2d").getImageData(0,0,w,h).data;
+    var rowSize=(w*3+3)&~3, pix=rowSize*h, size=54+pix;
+    var buf=new ArrayBuffer(size), dv=new DataView(buf), b=new Uint8Array(buf);
+    b[0]=0x42; b[1]=0x4D;
+    dv.setUint32(2,size,true); dv.setUint32(10,54,true);
+    dv.setUint32(14,40,true); dv.setInt32(18,w,true); dv.setInt32(22,h,true);
+    dv.setUint16(26,1,true); dv.setUint16(28,24,true); dv.setUint32(30,0,true);
+    dv.setUint32(34,pix,true); dv.setInt32(38,2835,true); dv.setInt32(42,2835,true);
+    for(var fr=0;fr<h;fr++){
+      var iy=h-1-fr, p=54+fr*rowSize, src=iy*w*4;
+      for(var x=0;x<w;x++){ var i=src+x*4; b[p]=data[i+2]; b[p+1]=data[i+1]; b[p+2]=data[i]; p+=3; }
+    }
+    return new Blob([buf],{type:"image/bmp"});
+  }
+
+  // Encode a canvas as an uncompressed 8-bit greyscale BMP with a linear palette.
+  function canvasToBMP8(cv){
+    var w=cv.width, h=cv.height;
+    var data=cv.getContext("2d").getImageData(0,0,w,h).data;
+    var rowSize=(w+3)&~3, pix=rowSize*h, offset=54+1024, size=offset+pix;
+    var buf=new ArrayBuffer(size), dv=new DataView(buf), b=new Uint8Array(buf);
+    b[0]=0x42; b[1]=0x4D;
+    dv.setUint32(2,size,true); dv.setUint32(10,offset,true);
+    dv.setUint32(14,40,true); dv.setInt32(18,w,true); dv.setInt32(22,h,true);
+    dv.setUint16(26,1,true); dv.setUint16(28,8,true); dv.setUint32(30,0,true);
+    dv.setUint32(34,pix,true); dv.setInt32(38,2835,true); dv.setInt32(42,2835,true);
+    dv.setUint32(46,256,true);
+    for(var c=0;c<256;c++){ var po=54+c*4; b[po]=c; b[po+1]=c; b[po+2]=c; b[po+3]=0; }
+    for(var fr=0;fr<h;fr++){
+      var iy=h-1-fr, p=offset+fr*rowSize, src=iy*w*4;
+      for(var x=0;x<w;x++){ var i=src+x*4; var lum=(0.299*data[i]+0.587*data[i+1]+0.114*data[i+2])|0; if(lum>255)lum=255; b[p+x]=lum; }
+    }
+    return new Blob([buf],{type:"image/bmp"});
+  }
+
+  function downloadCanvasAs(cv, fmt, name){
+    var ext = fmt==="png" ? "png" : "bmp";
+    var fname = name ? (name.indexOf(".")<0 ? name+"."+ext : name) : filenameFor(fmt);
+    if(fmt==="png"){ downloadCanvas(cv, fname); return; }
+    var blob;
+    try{ blob = fmt==="bmp8" ? canvasToBMP8(cv) : canvasToBMP24(cv); }
+    catch(err){ alert("Could not build the BMP. Try PNG, or a smaller preset."); return; }
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement("a"); a.href=url; a.download=fname; a.rel="noopener";
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ a.remove(); URL.revokeObjectURL(url); }, 500);
+  }
 
   // Synchronous toDataURL keeps us inside the click gesture (works where async toBlob is blocked)
   function downloadCanvas(cv, name){
@@ -1393,10 +1454,11 @@ var QRCodeLib = (function(){
     setTimeout(function(){ a.remove(); }, 120);
   }
 
+  $("#exportFormat").addEventListener("change",function(e){ state.exportFormat=e.target.value; });
   $("#downloadBtn").addEventListener("click",function(){
     // Paint a clean copy (no safe-zone guide) for the actual export, then restore the preview.
     paint(canvas, $("#mainText").value, $("#footText").value, {guide:false});
-    downloadCanvas(canvas, filename());
+    downloadCanvasAs(canvas, state.exportFormat);
     render();
   });
 
@@ -1566,7 +1628,7 @@ var QRCodeLib = (function(){
       paint(c, blk.main, blk.foot);
       var btn=document.createElement("button");
       btn.textContent="Download "+(idx+1);
-      btn.addEventListener("click",function(){ downloadCanvas(c, "eink-wallpaper-"+(idx+1)+".png"); });
+      btn.addEventListener("click",function(){ downloadCanvasAs(c, state.exportFormat, "eink-wallpaper-"+(idx+1)); });
       item.appendChild(c); item.appendChild(btn);
       gallery.appendChild(item);
     });
@@ -1579,7 +1641,7 @@ var QRCodeLib = (function(){
   $("#batchDownloadAll").addEventListener("click",function(){
     var canvases = $("#gallery").querySelectorAll("canvas");
     canvases.forEach(function(c,i){
-      setTimeout(function(){ downloadCanvas(c, "eink-wallpaper-"+(i+1)+".png"); }, i*400);
+      setTimeout(function(){ downloadCanvasAs(c, state.exportFormat, "eink-wallpaper-"+(i+1)); }, i*400);
     });
   });
 
@@ -1623,6 +1685,7 @@ var QRCodeLib = (function(){
       imgBlack:state.imgBlack, imgWhite:state.imgWhite, imgThreshold:state.imgThreshold, imgVignette:state.imgVignette, imgRound:state.imgRound,
       paperGrain:state.paperGrain,
       autoText:state.autoText, safeZone:state.safeZone,
+      exportFormat:state.exportFormat,
       customW:$("#customW").value, customH:$("#customH").value,
       mainText:$("#mainText").value, footText:$("#footText").value,
       qrUrl:$("#qrUrl").value, qrCaption:$("#qrCaption").value
@@ -1656,6 +1719,7 @@ var QRCodeLib = (function(){
     if(s.paperGrain!=null) state.paperGrain=+s.paperGrain;
     if(s.autoText!=null) state.autoText=!!s.autoText;
     if(s.safeZone!=null) state.safeZone=!!s.safeZone;
+    if(s.exportFormat) state.exportFormat=s.exportFormat;
     imgCache={canvas:null,key:""};
     if(s.presetIdx!=null && PRESETS[+s.presetIdx]) state.presetIdx=+s.presetIdx;
 
@@ -1691,6 +1755,7 @@ var QRCodeLib = (function(){
     $("#ditherChk").checked=state.dither;
     $("#autoTextChk").checked=state.autoText;
     $("#safeZoneChk").checked=state.safeZone;
+    $("#exportFormat").value=state.exportFormat;
 
     setSeg("#fontSeg","font","font",state.font);
     setSeg("#styleSeg","style","style",state.style);
