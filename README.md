@@ -20,7 +20,7 @@ Turn text and photos into high-contrast, grayscale wallpapers sized for e-ink de
 - **Finish** — Paper / Inverted / Slate themes, hairline border, accent rule, dither texture, **paper-grain texture**, **auto text color** (samples the photo behind the text and picks black or white for contrast), and a **lock-screen safe-zone guide** (preview-only markers for the iPhone clock, widgets, and home bar).
 - **Batch export** — write multiple wallpapers separated by a line of three dashes and generate them all at once.
 - **Saved looks** — store your full setup in the browser, and copy a portable settings code to move a look between devices.
-- **Export** — download a PNG, open it in a new tab (for iOS "Save to Photos"), or export the whole tool as a single HTML file.
+- **Export formats** — download as **PNG**, **24-bit BMP**, or **8-bit greyscale BMP**. Many e-ink devices (XTEink among them) will *display* a PNG but only accept a **24-bit BMP** as an actual wallpaper — pick that format for those. Also: open the image in a new tab (for iOS "Save to Photos"), or export the whole tool as a single HTML file.
 
 ## Template tokens
 
@@ -28,13 +28,13 @@ Type any of these into the main text, attribution, or QR caption and they're fil
 
 | Token | Example |
 | --- | --- |
-| `{date}` | September 27, 2026 |
-| `{shortdate}` | 9/27/2026 |
-| `{weekday}` | Sunday |
-| `{day}` | 27 |
+| `{date}` | September 29, 2026 |
+| `{shortdate}` | 9/29/2026 |
+| `{weekday}` | Tuesday |
+| `{day}` | 29 |
 | `{month}` | September |
 | `{year}` | 2026 |
-| `{time}` | 9:49 PM |
+| `{time}` | 10:18 PM |
 
 Tokens are resolved at the moment you export, producing a static image (great for a dated "daily" wallpaper you regenerate — not a self-updating clock).
 
@@ -45,6 +45,9 @@ Just open the live demo link above in any modern browser.
 
 ### On iPhone / iPad
 Open the hosted URL in **Safari** (not the Files app preview, which won't run the tool's JavaScript). To save a wallpaper: tap **Open image in new tab**, then long-press the PNG and choose **Save to Photos**. Optionally use **Share → Add to Home Screen** for an app-like icon.
+
+### On an e-ink reader (e.g. XTEink)
+Generate at your device's preset, choose the **24-bit BMP** format, download, transfer it to the device, and set it as your wallpaper. If the device's wallpaper picker rejects it, try the **8-bit greyscale BMP** instead.
 
 ### Run your own copy
 This is a single `index.html` file — host it anywhere static.
@@ -58,6 +61,7 @@ This is a single `index.html` file — host it anywhere static.
 
 - Vanilla HTML/CSS/JavaScript with the Canvas API — no frameworks, no build tooling.
 - Grayscale conversion, levels, gamma, sharpening, vignette, dithering (Floyd–Steinberg, Atkinson, Bayer, halftone), and quantization run as pixel passes on the canvas; results are cached so only changed settings trigger a re-process.
+- PNG export uses the canvas encoder; BMP export is a self-contained encoder that writes uncompressed 24-bit or 8-bit (palettized greyscale) Windows BMP files directly from the pixel data, since browsers can't emit BMP natively.
 - The QR generator is a self-contained implementation (byte mode, error-correction level M, auto version selection up to v10), based on `qrcode-generator` by Kazuhiko Arase (MIT).
 - Works fully offline once loaded — every asset is inline.
 
