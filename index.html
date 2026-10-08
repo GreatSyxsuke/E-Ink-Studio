@@ -1126,6 +1126,26 @@ var QRCodeLib = (function(){
 
   function dfont(weight,px){ return weight+" "+px+"px "+FONTS[state.font]; }
 
+  function invColor(col){ return (col==="#ffffff"||col==="#fff") ? "#000000" : "#ffffff"; }
+
+  // Agenda line: "[x] text" = done (check + strikethrough), "[ ] text" or plain = open.
+  function parseAgendaItem(line){
+    var m2=line.match(/^\s*\[([ xX])\]\s*(.*)$/);
+    if(m2){ return {done:m2[1].toLowerCase()==="x", text:m2[2]}; }
+    return {done:false, text:line.replace(/^\s+/,"")};
+  }
+
+  // Habit line: "Label | x x . x . . ." (or "xx.x..."); x/1/o/✓ = ticked.
+  function parseHabit(line){
+    var parts=line.split("|"), label=parts[0].trim(), ticks=[false,false,false,false,false,false,false];
+    if(parts.length>1){
+      var raw=parts[1].trim();
+      var seq = /[\s,]/.test(raw) ? raw.split(/[\s,]+/) : raw.split("");
+      for(var i=0;i<7 && i<seq.length;i++){ var t=(seq[i]||"").toLowerCase(); ticks[i]=(t==="x"||t==="1"||t==="o"||t==="✓"||t==="•"); }
+    }
+    return {label:label, ticks:ticks};
+  }
+
   // ---- Dashboard templates (date card, agenda, habit grid) ----
   function drawDashboard(g,w,h,m,fg,accent,mainText,footText){
     if(state.template==="datecard") drawDateCard(g,w,h,m,fg,accent,mainText,footText);
@@ -1164,15 +1184,25 @@ var QRCodeLib = (function(){
     var hb=m+hPx+sPx*1.5+sPx*0.8;
     g.strokeStyle=accent; g.lineWidth=Math.max(2,Math.round(mind*0.004));
     g.beginPath(); g.moveTo(x, hb); g.lineTo(w-m, hb); g.stroke();
-    var items=(mainText||"").split("\n").filter(function(s){return s.trim();});
+    var items=(mainText||"").split("\n").filter(function(s){return s.trim();}).map(parseAgendaItem);
     var rowPx=Math.round(mind*0.040), rowH=Math.round(mind*0.082), box=rowPx;
-    var y=hb+rowH;
+    var y=hb+rowH, lw=Math.max(1.5,Math.round(mind*0.0028));
     while(y < h-m){
-      g.strokeStyle=fg; g.lineWidth=Math.max(1.5,Math.round(mind*0.0028));
-      g.strokeRect(x, y-box, box, box);
+      g.strokeStyle=fg; g.lineWidth=lw; g.strokeRect(x, y-box, box, box);
       if(items.length){
+        var it=items.shift();
+        if(it.done){
+          g.strokeStyle=fg; g.lineWidth=Math.max(2,Math.round(mind*0.0045));
+          g.beginPath(); g.moveTo(x+box*0.2, y-box*0.45); g.lineTo(x+box*0.42, y-box*0.2); g.lineTo(x+box*0.82, y-box*0.72); g.stroke();
+        }
         g.fillStyle=fg; g.font=dfont("400",rowPx); g.textAlign="left";
-        g.fillText(items.shift(), x+box*1.5, y-box*0.15);
+        var tx=x+box*1.5, ty=y-box*0.15;
+        g.fillText(it.text, tx, ty);
+        if(it.done){
+          var tw=g.measureText(it.text).width;
+          g.strokeStyle=fg; g.lineWidth=Math.max(1.5,Math.round(mind*0.003));
+          g.beginPath(); g.moveTo(tx, ty-rowPx*0.3); g.lineTo(tx+tw, ty-rowPx*0.3); g.stroke();
+        }
       } else {
         g.strokeStyle=accent; g.globalAlpha=0.45;
         g.beginPath(); g.moveTo(x+box*1.5, y); g.lineTo(w-m, y); g.stroke(); g.globalAlpha=1;
@@ -1183,28 +1213,44 @@ var QRCodeLib = (function(){
 
   function drawHabit(g,w,h,m,fg,accent,mainText){
     var dp=dateParts(), mind=Math.min(w,h);
+    var now=new Date(), ws=new Date(now); ws.setDate(now.getDate()-now.getDay());
+    var dates=[]; for(var i=0;i<7;i++){ var d2=new Date(ws); d2.setDate(ws.getDate()+i); dates.push(d2.getDate()); }
+    var todayIdx=now.getDay(), inits=["S","M","T","W","T","F","S"], inv=invColor(fg);
     g.textAlign="left"; g.textBaseline="alphabetic";
-    var hPx=Math.round(mind*0.065);
+    var hPx=Math.round(mind*0.058);
     g.fillStyle=fg; g.font=dfont("700",hPx); g.fillText(dp.month+" "+dp.year, m, m+hPx);
-    var cols=7, inits=["S","M","T","W","T","F","S"], innerW=w-2*m;
-    var gridLeft=m+innerW*0.42, gridRight=w-m, colW=(gridRight-gridLeft)/cols;
-    var chY=m+hPx+Math.round(mind*0.06);
-    g.textAlign="center"; g.fillStyle=accent; g.font=dfont("600",Math.round(mind*0.032));
-    for(var i=0;i<cols;i++){ g.fillText(inits[i], gridLeft+colW*(i+0.5), chY); }
-    g.strokeStyle=accent; g.lineWidth=Math.max(2,Math.round(mind*0.003));
-    g.beginPath(); g.moveTo(m, chY+Math.round(mind*0.02)); g.lineTo(w-m, chY+Math.round(mind*0.02)); g.stroke();
-    var labels=(mainText||"").split("\n").filter(function(s){return s.trim();});
-    if(!labels.length) labels=["","","",""];
-    var rowH=Math.round(mind*0.072), box=Math.min(colW*0.5, rowH*0.55);
-    var y=chY+Math.round(mind*0.04)+rowH;
-    for(var r=0;r<labels.length;r++){
+    var cols=7, innerW=w-2*m, gridLeft=m+innerW*0.40, gridRight=w-m, colW=(gridRight-gridLeft)/cols;
+    var chY=m+hPx+Math.round(mind*0.095);
+    var initPx=Math.round(mind*0.026), datePx=Math.round(mind*0.032), rad=Math.max(datePx*0.95, mind*0.03);
+    g.textAlign="center"; g.textBaseline="alphabetic";
+    for(var i=0;i<cols;i++){
+      var ccx=gridLeft+colW*(i+0.5);
+      g.fillStyle=accent; g.font=dfont("600",initPx); g.fillText(inits[i], ccx, chY-datePx*1.15);
+      if(i===todayIdx){ g.fillStyle=fg; g.beginPath(); g.arc(ccx, chY-datePx*0.33, rad, 0, Math.PI*2); g.fill(); g.fillStyle=inv; }
+      else { g.fillStyle=fg; }
+      g.font=dfont(i===todayIdx?"700":"400",datePx); g.fillText(String(dates[i]), ccx, chY);
+    }
+    g.strokeStyle=accent; g.lineWidth=Math.max(1.5,Math.round(mind*0.003));
+    g.beginPath(); g.moveTo(m, chY+Math.round(mind*0.03)); g.lineTo(w-m, chY+Math.round(mind*0.03)); g.stroke();
+    var habits=(mainText||"").split("\n").filter(function(s){return s.trim();}).map(parseHabit);
+    if(!habits.length) habits=[{label:"",ticks:[false,false,false,false,false,false,false]}];
+    var rowH=Math.round(mind*0.066), box=Math.min(colW*0.44, rowH*0.52);
+    var y=chY+Math.round(mind*0.07)+rowH*0.5;
+    for(var r=0;r<habits.length;r++){
       if(y>h-m) break;
-      g.textAlign="left"; g.fillStyle=fg; g.font=dfont("400",Math.round(mind*0.038));
-      g.fillText(labels[r], m, y);
-      g.strokeStyle=fg; g.lineWidth=Math.max(1.5,Math.round(mind*0.0028));
-      for(var c=0;c<cols;c++){ g.strokeRect(gridLeft+colW*c+(colW-box)/2, y-box*0.8, box, box); }
-      g.strokeStyle=accent; g.globalAlpha=0.25;
-      g.beginPath(); g.moveTo(m, y+rowH*0.25); g.lineTo(w-m, y+rowH*0.25); g.stroke(); g.globalAlpha=1;
+      var hb2=habits[r];
+      g.textAlign="left"; g.textBaseline="alphabetic"; g.fillStyle=fg; g.font=dfont("400",Math.round(mind*0.036));
+      g.fillText(hb2.label, m, y+box*0.35);
+      for(var c=0;c<cols;c++){
+        var bx=gridLeft+colW*c+(colW-box)/2, by=y-box*0.5;
+        g.strokeStyle=fg; g.lineWidth=Math.max(1.5,Math.round(mind*0.0026)); g.strokeRect(bx,by,box,box);
+        if(hb2.ticks[c]){
+          g.strokeStyle=fg; g.lineWidth=Math.max(2,Math.round(mind*0.0038));
+          g.beginPath(); g.moveTo(bx+box*0.2, by+box*0.52); g.lineTo(bx+box*0.42, by+box*0.78); g.lineTo(bx+box*0.82, by+box*0.22); g.stroke();
+        }
+      }
+      g.strokeStyle=accent; g.globalAlpha=0.2;
+      g.beginPath(); g.moveTo(m, y+rowH*0.3); g.lineTo(w-m, y+rowH*0.3); g.stroke(); g.globalAlpha=1;
       y+=rowH;
     }
   }
@@ -1486,8 +1532,8 @@ var QRCodeLib = (function(){
   var TEMPLATE_HINTS={
     quote:"A single centered quote with optional attribution.",
     datecard:"Big auto date. Main text = subtitle lines; attribution = footer.",
-    agenda:"Auto date header. Each line of main text becomes a to-do; blank slots are ruled lines to write on.",
-    habit:"Auto month header + weekly grid. Each line of main text is a habit label."
+    agenda:"One to-do per line. Start a line with [x] to show it checked and struck through; blank slots become ruled lines.",
+    habit:"One habit per line, with the current week + today highlighted. Add ticks after a | — e.g. “Floss | x x . x . . .” (x = done)."
   };
   $("#templateSeg").addEventListener("click",function(e){
     var b=e.target.closest("button"); if(!b) return;
