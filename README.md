@@ -52,4 +52,56 @@ One habit per line. After a `|`, mark which days of the week are ticked (Sun→S
 Touch grass | x . x . x . .
 Doomscroll less | x x x x x x x
 Hydrate (allegedly) | . . x . . . x
-Blink manually | xxxxx
+Blink manually | xxxxxxx
+```
+
+## Template tokens
+
+Type any of these into the main text, attribution, or QR caption and they're filled in when you generate:
+
+| Token | Example |
+| --- | --- |
+| `{date}` | October 7, 2026 |
+| `{shortdate}` | 10/7/2026 |
+| `{weekday}` | Wednesday |
+| `{day}` | 7 |
+| `{month}` | October |
+| `{year}` | 2026 |
+| `{time}` | 8:08 PM |
+
+Tokens are resolved at the moment you export, producing a static image (great for a dated "daily" wallpaper you regenerate — not a self-updating clock).
+
+## Usage
+
+### Online
+Just open the live demo link above in any modern browser.
+
+### On iPhone / iPad
+Open the hosted URL in **Safari** (not the Files app preview, which won't run the tool's JavaScript). To save a wallpaper: tap **Open image in new tab**, then long-press the PNG and choose **Save to Photos**. Optionally use **Share → Add to Home Screen** for an app-like icon.
+
+### On an e-ink reader (e.g. XTEink)
+1. Choose your device's preset and orientation.
+2. Set **E-ink render** to match the panel — try **16-level grey** first; if the screen still speckles, use **1-bit · Atkinson** or **1-bit · Bayer**. This does the dithering in the tool so the panel won't add its own grain, and the preview shows exactly what you'll get.
+3. Set the format to **24-bit BMP**, download, transfer it to the device, and set it as your wallpaper. If the wallpaper picker rejects the 24-bit BMP, try the **8-bit greyscale BMP** instead.
+
+Note: the Agenda checkboxes and Habit boxes are filled in **in the tool** (via the syntax above) and exported as a static image — handy for a display dashboard or a joke sleep screen. To physically check them with a stylus, use a pen-enabled device (reMarkable, Supernote, Boox with pen) and import the image as a notebook/template page instead of a wallpaper.
+
+### Run your own copy
+This is a single `index.html` file — host it anywhere static.
+
+**GitHub Pages:**
+1. Add `index.html` to a public repo.
+2. Settings → Pages → Source: **Deploy from a branch** → `main` / `root` → Save.
+3. Open the `https://<username>.github.io/<repo>/` URL.
+
+## Tech notes
+
+- Vanilla HTML/CSS/JavaScript with the Canvas API — no frameworks, no build tooling.
+- Grayscale conversion, levels, gamma, sharpening, vignette, dithering (Floyd–Steinberg, Atkinson, Bayer, halftone), and quantization run as pixel passes on the canvas; results are cached so only changed settings trigger a re-process. The optional **E-ink render** applies a final whole-image dither/quantize so preview and device agree.
+- PNG export uses the canvas encoder; BMP export is a self-contained encoder that writes uncompressed 24-bit or 8-bit (palettized greyscale) Windows BMP files directly from the pixel data, since browsers can't emit BMP natively.
+- The QR generator is a self-contained implementation (byte mode, error-correction level M, auto version selection up to v10), based on `qrcode-generator` by Kazuhiko Arase (MIT).
+- Works fully offline once loaded — every asset is inline.
+
+## License
+
+MIT — do whatever you like; attribution appreciated.
