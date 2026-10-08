@@ -30,56 +30,26 @@ Turn text and photos into high-contrast, grayscale wallpapers sized for e-ink de
 | --- | --- | --- |
 | **Quote** | A single centered quote with optional attribution. | The quote; attribution is the footer. |
 | **Date** | A large day number with the weekday above and month/year below. | A subtitle line under the date; attribution is the footer. |
-| **Agenda** | A weekday + date header, then a checklist. | Each line becomes a to-do item; leftover rows are blank ruled lines to write on. |
-| **Habits** | A month header and a 7-column week grid (S–S). | Each line becomes a habit row with a week of empty boxes to tick. |
+| **Agenda** | A weekday + date header, then a checklist. | One to-do per line (see syntax below); leftover rows are blank ruled lines. |
+| **Habits** | A month header and the current week's dates with **today highlighted**, then a tick grid. | One habit per line with optional per-day ticks (see syntax below). |
 
-The Date, Agenda, and Habit templates read the current date automatically, so they always open current.
+The Date, Agenda, and Habit templates read the current date automatically. "Today" is baked in at export, so generate on the day you want shown.
 
-## Template tokens
+### Agenda syntax
+One task per line. Prefix a line with `[x]` to show it done (checkmark in the box and a line through the text); `[ ]` or no prefix leaves it open. Blank slots become ruled lines.
 
-Type any of these into the main text, attribution, or QR caption and they're filled in when you generate:
+```
+[x] Reply to the void
+[x] Alphabetize the spice rack (again)
+[ ] Finally learn to whistle
+Water the imaginary plant
+```
 
-| Token | Example |
-| --- | --- |
-| `{date}` | October 7, 2026 |
-| `{shortdate}` | 10/7/2026 |
-| `{weekday}` | Wednesday |
-| `{day}` | 7 |
-| `{month}` | October |
-| `{year}` | 2026 |
-| `{time}` | 7:50 PM |
+### Habit syntax
+One habit per line. After a `|`, mark which days of the week are ticked (Sun→Sat) using `x` for done and `.` or a space for empty. Compact (`xxx....`) and spaced (`x x x . . . .`) both work; `x`, `1`, `o`, and `✓` all count as ticked. No `|` means an empty row.
 
-Tokens are resolved at the moment you export, producing a static image (great for a dated "daily" wallpaper you regenerate — not a self-updating clock).
-
-## Usage
-
-### Online
-Just open the live demo link above in any modern browser.
-
-### On iPhone / iPad
-Open the hosted URL in **Safari** (not the Files app preview, which won't run the tool's JavaScript). To save a wallpaper: tap **Open image in new tab**, then long-press the PNG and choose **Save to Photos**. Optionally use **Share → Add to Home Screen** for an app-like icon.
-
-### On an e-ink reader (e.g. XTEink)
-1. Choose your device's preset and orientation.
-2. Set **E-ink render** to match the panel — try **16-level grey** first; if the screen still speckles, use **1-bit · Atkinson** or **1-bit · Bayer**. This does the dithering in the tool so the panel won't add its own grain, and the preview shows exactly what you'll get.
-3. Set the format to **24-bit BMP**, download, transfer it to the device, and set it as your wallpaper. If the wallpaper picker rejects the 24-bit BMP, try the **8-bit greyscale BMP** instead.
-
-### Run your own copy
-This is a single `index.html` file — host it anywhere static.
-
-**GitHub Pages:**
-1. Add `index.html` to a public repo.
-2. Settings → Pages → Source: **Deploy from a branch** → `main` / `root` → Save.
-3. Open the `https://<username>.github.io/<repo>/` URL.
-
-## Tech notes
-
-- Vanilla HTML/CSS/JavaScript with the Canvas API — no frameworks, no build tooling.
-- Grayscale conversion, levels, gamma, sharpening, vignette, dithering (Floyd–Steinberg, Atkinson, Bayer, halftone), and quantization run as pixel passes on the canvas; results are cached so only changed settings trigger a re-process. The optional **E-ink render** applies a final whole-image dither/quantize so preview and device agree.
-- PNG export uses the canvas encoder; BMP export is a self-contained encoder that writes uncompressed 24-bit or 8-bit (palettized greyscale) Windows BMP files directly from the pixel data, since browsers can't emit BMP natively.
-- The QR generator is a self-contained implementation (byte mode, error-correction level M, auto version selection up to v10), based on `qrcode-generator` by Kazuhiko Arase (MIT).
-- Works fully offline once loaded — every asset is inline.
-
-## License
-
-MIT — do whatever you like; attribution appreciated.
+```
+Touch grass | x . x . x . .
+Doomscroll less | x x x x x x x
+Hydrate (allegedly) | . . x . . . x
+Blink manually | xxxxx
