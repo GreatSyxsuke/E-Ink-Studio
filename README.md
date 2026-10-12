@@ -25,6 +25,7 @@ Toggle **portrait / landscape** on any preset.
 - **Habits** — tick a row with `Label | x x . x . . .` (filled vs. empty cells)
 - Built-in fonts plus **custom font upload** (any `.ttf`/`.otf`/`.woff`)
 - Control style, size, alignment, vertical position, and margin
+- **Surprise me** button to shuffle a fresh look
 
 ### Finish
 - Light or dark theme
@@ -43,12 +44,16 @@ Load a JPG/PNG/WebP and it's converted to grayscale and sized to the preset.
 - **Adjust tone:** brightness, contrast, sharpen
 - **Effects:** threshold, vignette, rounded corners
 
-### E-ink render
+### E-ink render & preview
 Optionally quantize the whole composition to the panel's depth (1-bit Floyd / Atkinson / Bayer, or 16-level grey) so the preview matches the device and the panel won't re-dither it.
+
+Turn on **Compare smooth vs e-ink** to split the preview side by side — the smooth composite next to what the panel will actually show — so you can judge grain before exporting.
 
 ### Export
 - **PNG** — for sharing or phone lock screens
 - **24-bit BMP** — the format the XTEink readers accept for custom wallpapers
+- Exports are **rendered at 2× and downscaled** for crisper text and edges, then dithered at true panel resolution (1-bit photo looks render at native size to stay sharp)
+- **Copy image to clipboard** for quick pasting, alongside Download and Open-in-new-tab
 
 ### Save & reuse
 - **Saved looks** persist in your browser, plus a copyable settings code to move a look between devices
@@ -61,7 +66,14 @@ Optionally quantize the whole composition to the panel's depth (1-bit Floyd / At
 2. Build your wallpaper and export as **24-bit BMP**.
 3. On the X3, set it as your custom sleep/wallpaper image.
 
-> If a photo looks grainy on-device, start from a higher-resolution source and try the **16-level** look or turn on **E-ink render**.
+> If a photo looks grainy on-device, start from a higher-resolution source and try the **16-level** look or turn on **E-ink render**. Use **Compare smooth vs e-ink** to preview the result first.
+
+## Repo files
+
+- `index.html` — the entire app
+- `README.md` — this file
+- `LICENSE` — MIT
+- `og-image.png` — social-share preview image (1200×630). Generate it from the **"share image"** link in the app footer and drop it in the repo root; the page's Open Graph tags point here.
 
 ## License
 
