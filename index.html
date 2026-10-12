@@ -116,15 +116,6 @@
   }
   .filebtn:hover{border-color:var(--accent);color:var(--accent);}
   .filebtn input{display:none;}
-  .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:10px;margin:12px 0 4px;}
-  .gallery:empty{display:none;}
-  .thumb{display:flex;flex-direction:column;gap:5px;align-items:center;min-width:0;}
-  .thumb canvas{width:100%;height:auto;border:1px solid var(--line);border-radius:4px;background:#fff;display:block;}
-  .thumb button{
-    font-size:11px;padding:4px 6px;border:1px solid var(--line);background:#fff;border-radius:6px;
-    cursor:pointer;font-family:inherit;width:100%;font-weight:600;color:#2a271f;
-  }
-  .thumb button:hover{border-color:#b3ada0;}
   .preset-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
   .preset-chip{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
   .pc-load{
@@ -137,6 +128,17 @@
     color:var(--muted);font-size:15px;line-height:1;font-family:inherit;
   }
   .pc-del:hover{background:var(--accent);color:#fff;}
+  .subgroup{border-top:1px solid var(--line);margin-top:6px;}
+  .subgroup>summary{
+    list-style:none;cursor:pointer;padding:10px 0 8px;
+    font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--muted);
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .subgroup>summary::-webkit-details-marker{display:none;}
+  .subgroup>summary::after{content:"+";font-size:15px;line-height:1;color:var(--muted);}
+  .subgroup[open]>summary::after{content:"\2013";}
+  .subgroup>summary:hover{color:var(--ink);}
+  .subgroup .field:first-of-type{margin-top:2px;}
   .stage{position:sticky;top:18px;min-width:0;}
   .stage-inner{
     background:
@@ -199,23 +201,10 @@ stay hungry.</textarea>
             </div>
           </label>
           <label class="field">
-            <span class="field-label">Zoom</span>
-            <div class="range-row"><input type="range" id="imgZoomRange" min="100" max="300" value="100"><span class="range-val" id="imgZoomVal">1.0x</span></div>
-          </label>
-          <label class="field">
-            <span class="field-label">Pan horizontal</span>
-            <div class="range-row"><input type="range" id="imgPanXRange" min="-100" max="100" value="0"><span class="range-val" id="imgPanXVal">0</span></div>
-          </label>
-          <label class="field">
-            <span class="field-label">Pan vertical</span>
-            <div class="range-row"><input type="range" id="imgPanYRange" min="-100" max="100" value="0"><span class="range-val" id="imgPanYVal">0</span></div>
-          </label>
-          <label class="field">
             <span class="field-label">Look</span>
             <div class="seg" id="imgModeSeg">
               <button data-imgmode="grey" class="active">Greyscale</button>
               <button data-imgmode="grey16">16-level</button>
-              <button data-imgmode="grey4">4-level</button>
               <button data-imgmode="dither">Floyd</button>
               <button data-imgmode="atkinson">Atkinson</button>
               <button data-imgmode="bayer">Bayer</button>
@@ -224,47 +213,60 @@ stay hungry.</textarea>
             </div>
           </label>
           <label class="field">
-            <span class="field-label">Brightness</span>
-            <div class="range-row"><input type="range" id="imgBrightRange" min="-100" max="100" value="0"><span class="range-val" id="imgBrightVal">0</span></div>
-          </label>
-          <label class="field">
-            <span class="field-label">Contrast</span>
-            <div class="range-row"><input type="range" id="imgContrastRange" min="-100" max="100" value="0"><span class="range-val" id="imgContrastVal">0</span></div>
-          </label>
-          <label class="field">
-            <span class="field-label">Gamma</span>
-            <div class="range-row"><input type="range" id="imgGammaRange" min="50" max="250" value="100"><span class="range-val" id="imgGammaVal">1.00</span></div>
-          </label>
-          <label class="field">
-            <span class="field-label">Sharpen</span>
-            <div class="range-row"><input type="range" id="imgSharpenRange" min="0" max="100" value="0"><span class="range-val" id="imgSharpenVal">0</span></div>
-          </label>
-          <label class="field">
-            <span class="field-label">Black point</span>
-            <div class="range-row"><input type="range" id="imgBlackRange" min="0" max="90" value="0"><span class="range-val" id="imgBlackVal">0</span></div>
-          </label>
-          <label class="field">
-            <span class="field-label">White point</span>
-            <div class="range-row"><input type="range" id="imgWhiteRange" min="10" max="100" value="100"><span class="range-val" id="imgWhiteVal">100</span></div>
-          </label>
-          <label class="field">
-            <span class="field-label">Two-tone threshold</span>
-            <div class="range-row"><input type="range" id="imgThresholdRange" min="5" max="95" value="50"><span class="range-val" id="imgThresholdVal">50</span></div>
-          </label>
-          <label class="field">
-            <span class="field-label">Vignette</span>
-            <div class="range-row"><input type="range" id="imgVignetteRange" min="0" max="100" value="0"><span class="range-val" id="imgVignetteVal">0</span></div>
-          </label>
-          <label class="field">
-            <span class="field-label">Rounded corners</span>
-            <div class="range-row"><input type="range" id="imgRoundRange" min="0" max="100" value="0"><span class="range-val" id="imgRoundVal">0</span></div>
-          </label>
-          <label class="field">
             <span class="field-label">Fade behind text</span>
             <div class="range-row"><input type="range" id="imgFadeRange" min="0" max="90" value="0"><span class="range-val" id="imgFadeVal">0%</span></div>
           </label>
-          <button class="btn-ghost" id="imgRemoveBtn" style="margin-top:0;">Remove image</button>
-          <p class="hint">Converted to greyscale and sized to the exact preset. “Dithered” mimics real e-ink shading; “Two-tone” is pure 1-bit black &amp; white. Raise Fade to keep overlaid text legible.</p>
+
+          <details class="subgroup">
+            <summary>Position &amp; crop</summary>
+            <label class="field">
+              <span class="field-label">Zoom</span>
+              <div class="range-row"><input type="range" id="imgZoomRange" min="100" max="300" value="100"><span class="range-val" id="imgZoomVal">1.0x</span></div>
+            </label>
+            <label class="field">
+              <span class="field-label">Pan horizontal</span>
+              <div class="range-row"><input type="range" id="imgPanXRange" min="-100" max="100" value="0"><span class="range-val" id="imgPanXVal">0</span></div>
+            </label>
+            <label class="field" style="margin-bottom:4px;">
+              <span class="field-label">Pan vertical</span>
+              <div class="range-row"><input type="range" id="imgPanYRange" min="-100" max="100" value="0"><span class="range-val" id="imgPanYVal">0</span></div>
+            </label>
+          </details>
+
+          <details class="subgroup">
+            <summary>Adjust tone</summary>
+            <label class="field">
+              <span class="field-label">Brightness</span>
+              <div class="range-row"><input type="range" id="imgBrightRange" min="-100" max="100" value="0"><span class="range-val" id="imgBrightVal">0</span></div>
+            </label>
+            <label class="field">
+              <span class="field-label">Contrast</span>
+              <div class="range-row"><input type="range" id="imgContrastRange" min="-100" max="100" value="0"><span class="range-val" id="imgContrastVal">0</span></div>
+            </label>
+            <label class="field" style="margin-bottom:4px;">
+              <span class="field-label">Sharpen</span>
+              <div class="range-row"><input type="range" id="imgSharpenRange" min="0" max="100" value="0"><span class="range-val" id="imgSharpenVal">0</span></div>
+            </label>
+          </details>
+
+          <details class="subgroup">
+            <summary>Effects</summary>
+            <label class="field">
+              <span class="field-label">Two-tone threshold</span>
+              <div class="range-row"><input type="range" id="imgThresholdRange" min="5" max="95" value="50"><span class="range-val" id="imgThresholdVal">50</span></div>
+            </label>
+            <label class="field">
+              <span class="field-label">Vignette</span>
+              <div class="range-row"><input type="range" id="imgVignetteRange" min="0" max="100" value="0"><span class="range-val" id="imgVignetteVal">0</span></div>
+            </label>
+            <label class="field" style="margin-bottom:4px;">
+              <span class="field-label">Rounded corners</span>
+              <div class="range-row"><input type="range" id="imgRoundRange" min="0" max="100" value="0"><span class="range-val" id="imgRoundVal">0</span></div>
+            </label>
+          </details>
+
+          <button class="btn-ghost" id="imgRemoveBtn" style="margin-top:14px;">Remove image</button>
+          <p class="hint">Converted to greyscale and sized to the exact preset. Pick a <strong>Look</strong> to control dithering, and raise <strong>Fade</strong> to keep overlaid text legible. Fine-tuning lives in the sections above.</p>
         </div>
       </div>
 
@@ -397,29 +399,6 @@ stay hungry.</textarea>
       </div>
 
       <div class="card">
-        <h2>Batch export <span id="batchCount" style="font-size:10px;letter-spacing:0;text-transform:none;color:var(--muted);font-weight:600;"></span></h2>
-        <label class="field">
-          <span class="field-label">One wallpaper per block — separate blocks with a line of three dashes</span>
-          <textarea id="batchText" placeholder="Less
-is more.
-— Mies van der Rohe
----
-Do the
-work.
----
-Begin
-anywhere."></textarea>
-        </label>
-        <button class="btn-ghost" id="batchBtn" style="margin-top:0;">Generate batch</button>
-        <div id="gallery" class="gallery"></div>
-        <div id="batchActions" style="display:none;">
-          <button class="btn-primary" id="batchDownloadAll">Download all</button>
-          <button class="btn-ghost" id="batchOpenAll">Open all in new tab</button>
-        </div>
-        <p class="hint">A line starting with an em dash (—) becomes that wallpaper's attribution. Every wallpaper uses your current device, type, theme &amp; QR settings — regenerate after changing them.</p>
-      </div>
-
-      <div class="card">
         <h2>Finish</h2>
         <label class="field">
           <span class="field-label">Theme</span>
@@ -430,24 +409,24 @@ anywhere."></textarea>
           </div>
         </label>
         <label class="check" style="margin-bottom:10px;">
-          <input type="checkbox" id="borderChk"> Hairline border frame
-        </label>
-        <label class="check" style="margin-bottom:10px;">
           <input type="checkbox" id="ruleChk" checked=""> Accent rule under text
         </label>
-        <label class="check" style="margin-bottom:10px;">
-          <input type="checkbox" id="ditherChk"> Dither texture background
-        </label>
-        <label class="check" style="margin-bottom:10px;">
-          <input type="checkbox" id="autoTextChk"> Auto text color (contrast with photo)
-        </label>
         <label class="check">
-          <input type="checkbox" id="safeZoneChk"> Lock-screen safe-zone guide (preview only)
+          <input type="checkbox" id="borderChk"> Hairline border frame
         </label>
-        <label class="field" style="margin-top:12px;margin-bottom:0;">
-          <span class="field-label">Paper grain</span>
-          <div class="range-row"><input type="range" id="paperGrainRange" min="0" max="100" value="0"><span class="range-val" id="paperGrainVal">0</span></div>
-        </label>
+        <details class="subgroup">
+          <summary>Extras</summary>
+          <label class="check" style="margin:4px 0 10px;">
+            <input type="checkbox" id="autoTextChk"> Auto text color (contrast with photo)
+          </label>
+          <label class="check" style="margin-bottom:12px;">
+            <input type="checkbox" id="safeZoneChk"> Lock-screen safe-zone guide (preview only)
+          </label>
+          <label class="field" style="margin-bottom:4px;">
+            <span class="field-label">Paper grain</span>
+            <div class="range-row"><input type="range" id="paperGrainRange" min="0" max="100" value="0"><span class="range-val" id="paperGrainVal">0</span></div>
+          </label>
+        </details>
       </div>
 
       <div class="card">
@@ -472,7 +451,6 @@ anywhere."></textarea>
           <select id="exportFormat">
             <option value="png">PNG</option>
             <option value="bmp24">BMP · 24-bit (e-ink wallpaper)</option>
-            <option value="bmp8">BMP · 8-bit greyscale (smaller)</option>
           </select>
         </label>
         <label class="field" style="margin-bottom:10px;">
@@ -859,12 +837,12 @@ var QRCodeLib = (function(){
     presetIdx:0, font:"serif", style:"regular", size:92,
     align:"center", vpos:"middle", margin:12, theme:"light",
     orientation:"portrait", template:"quote",
-    border:false, rule:true, dither:false,
+    border:false, rule:true,
     qrpos:"none", qrsize:22,
     imgFit:"cover", imgMode:"grey", imgBright:0, imgContrast:0, imgFade:0,
-    imgGamma:100, imgSharpen:0,
+    imgSharpen:0,
     imgZoom:100, imgPanX:0, imgPanY:0,
-    imgBlack:0, imgWhite:100, imgThreshold:50, imgVignette:0, imgRound:0,
+    imgThreshold:50, imgVignette:0, imgRound:0,
     paperGrain:0,
     autoText:false, safeZone:false,
     exportFormat:"png", einkOut:"off"
@@ -966,19 +944,6 @@ var QRCodeLib = (function(){
       v=factor*(v-128)+128+bright;
       lum[px]=v;
     }
-    // Gamma (via a 256-entry lookup on clamped tones)
-    if(state.imgGamma!==100){
-      var gv=state.imgGamma/100, glut=new Float32Array(256);
-      for(var t=0;t<256;t++) glut[t]=255*Math.pow(t/255,gv);
-      for(var gk=0;gk<lum.length;gk++){ var gvv=lum[gk]; gvv=gvv<0?0:(gvv>255?255:gvv); lum[gk]=glut[Math.round(gvv)]; }
-    }
-    // Levels: stretch the [black, white] input range out to full 0-255
-    if(state.imgBlack>0 || state.imgWhite<100){
-      var bp=state.imgBlack/100*255, wp=state.imgWhite/100*255;
-      if(wp<=bp) wp=bp+1;
-      var lscale=255/(wp-bp);
-      for(var lk=0;lk<lum.length;lk++) lum[lk]=(lum[lk]-bp)*lscale;
-    }
     // Sharpen (unsharp mask against a 3x3 box blur), applied to continuous tones before quantizing
     if(state.imgSharpen>0){
       var amt=state.imgSharpen/100*1.4;
@@ -1057,9 +1022,9 @@ var QRCodeLib = (function(){
       // Ordered dithering — 1-bit via the 8x8 Bayer threshold map, aligned to the canvas grid
       for(var by=0;by<H;by++){ var ay=(y0+by)&7;
         for(var bx=0;bx<W;bx++){ var bi=by*W+bx; var th=(BAYER8[ay][(x0+bx)&7]+0.5)/64*255; lum[bi]= lum[bi]>th?255:0; } }
-    } else if(state.imgMode==="grey16" || state.imgMode==="grey4"){
+    } else if(state.imgMode==="grey16"){
       // Posterize to evenly spaced grey levels (no diffusion) — matches true e-ink grey depths
-      var N=state.imgMode==="grey16"?15:3;
+      var N=15;
       for(var qk=0;qk<lum.length;qk++){ var qv=lum[qk]; if(qv<0)qv=0; if(qv>255)qv=255; lum[qk]=Math.round(qv/255*N)/N*255; }
     } else if(state.imgMode==="twotone"){
       for(var k=0;k<lum.length;k++) lum[k]=lum[k]<cutoff?0:255;
@@ -1076,8 +1041,8 @@ var QRCodeLib = (function(){
     if(!userImage) return null;
     var iw=userImage.naturalWidth||userImage.width, ih=userImage.naturalHeight||userImage.height;
     if(!iw||!ih) return null;
-    var key=[imgToken,w,h,state.imgFit,state.imgMode,state.imgBright,state.imgContrast,state.imgGamma,state.imgSharpen,
-      state.imgZoom,state.imgPanX,state.imgPanY,state.imgBlack,state.imgWhite,state.imgThreshold,state.imgVignette,state.imgRound].join("|");
+    var key=[imgToken,w,h,state.imgFit,state.imgMode,state.imgBright,state.imgContrast,state.imgSharpen,
+      state.imgZoom,state.imgPanX,state.imgPanY,state.imgThreshold,state.imgVignette,state.imgRound].join("|");
     if(imgCache.canvas && imgCache.key===key) return imgCache.canvas;
     var oc=document.createElement("canvas"); oc.width=w; oc.height=h;
     var og=oc.getContext("2d");
@@ -1351,17 +1316,6 @@ var QRCodeLib = (function(){
     g.fillStyle=theme.bg;
     g.fillRect(0,0,w,h);
 
-    if(state.dither){
-      var dotColor = state.theme==="dark" ? "rgba(255,255,255,.10)" : "rgba(0,0,0,.07)";
-      g.fillStyle=dotColor;
-      var step = Math.round(Math.max(w,h)/120);
-      for(var yy=0;yy<h;yy+=step){
-        for(var xx=(Math.floor(yy/step)%2)*Math.round(step/2);xx<w;xx+=step){
-          g.fillRect(xx,yy,Math.max(1,Math.round(step*0.16)),Math.max(1,Math.round(step*0.16)));
-        }
-      }
-    }
-
     // ----- PHOTO -----
     if(userImage){
       var proc=getProcessedImageCanvas(w,h);
@@ -1563,7 +1517,7 @@ var QRCodeLib = (function(){
     render();
   });
 
-  ["borderChk","ruleChk","ditherChk","autoTextChk","safeZoneChk"].forEach(function(id){
+  ["borderChk","ruleChk","autoTextChk","safeZoneChk"].forEach(function(id){
     $("#"+id).addEventListener("change",function(e){ state[id.replace("Chk","")]=e.target.checked; render(); });
   });
 
@@ -1597,13 +1551,10 @@ var QRCodeLib = (function(){
   });
   $("#imgBrightRange").addEventListener("input",function(e){ state.imgBright=+e.target.value; $("#imgBrightVal").textContent=e.target.value; render(); });
   $("#imgContrastRange").addEventListener("input",function(e){ state.imgContrast=+e.target.value; $("#imgContrastVal").textContent=e.target.value; render(); });
-  $("#imgGammaRange").addEventListener("input",function(e){ state.imgGamma=+e.target.value; $("#imgGammaVal").textContent=(e.target.value/100).toFixed(2); render(); });
   $("#imgSharpenRange").addEventListener("input",function(e){ state.imgSharpen=+e.target.value; $("#imgSharpenVal").textContent=e.target.value; render(); });
   $("#imgZoomRange").addEventListener("input",function(e){ state.imgZoom=+e.target.value; $("#imgZoomVal").textContent=(e.target.value/100).toFixed(1)+"x"; render(); });
   $("#imgPanXRange").addEventListener("input",function(e){ state.imgPanX=+e.target.value; $("#imgPanXVal").textContent=e.target.value; render(); });
   $("#imgPanYRange").addEventListener("input",function(e){ state.imgPanY=+e.target.value; $("#imgPanYVal").textContent=e.target.value; render(); });
-  $("#imgBlackRange").addEventListener("input",function(e){ state.imgBlack=+e.target.value; $("#imgBlackVal").textContent=e.target.value; render(); });
-  $("#imgWhiteRange").addEventListener("input",function(e){ state.imgWhite=+e.target.value; $("#imgWhiteVal").textContent=e.target.value; render(); });
   $("#imgThresholdRange").addEventListener("input",function(e){ state.imgThreshold=+e.target.value; $("#imgThresholdVal").textContent=e.target.value; render(); });
   $("#imgVignetteRange").addEventListener("input",function(e){ state.imgVignette=+e.target.value; $("#imgVignetteVal").textContent=e.target.value; render(); });
   $("#imgRoundRange").addEventListener("input",function(e){ state.imgRound=+e.target.value; $("#imgRoundVal").textContent=e.target.value; render(); });
@@ -1631,32 +1582,12 @@ var QRCodeLib = (function(){
     return new Blob([buf],{type:"image/bmp"});
   }
 
-  // Encode a canvas as an uncompressed 8-bit greyscale BMP with a linear palette.
-  function canvasToBMP8(cv){
-    var w=cv.width, h=cv.height;
-    var data=cv.getContext("2d").getImageData(0,0,w,h).data;
-    var rowSize=(w+3)&~3, pix=rowSize*h, offset=54+1024, size=offset+pix;
-    var buf=new ArrayBuffer(size), dv=new DataView(buf), b=new Uint8Array(buf);
-    b[0]=0x42; b[1]=0x4D;
-    dv.setUint32(2,size,true); dv.setUint32(10,offset,true);
-    dv.setUint32(14,40,true); dv.setInt32(18,w,true); dv.setInt32(22,h,true);
-    dv.setUint16(26,1,true); dv.setUint16(28,8,true); dv.setUint32(30,0,true);
-    dv.setUint32(34,pix,true); dv.setInt32(38,2835,true); dv.setInt32(42,2835,true);
-    dv.setUint32(46,256,true);
-    for(var c=0;c<256;c++){ var po=54+c*4; b[po]=c; b[po+1]=c; b[po+2]=c; b[po+3]=0; }
-    for(var fr=0;fr<h;fr++){
-      var iy=h-1-fr, p=offset+fr*rowSize, src=iy*w*4;
-      for(var x=0;x<w;x++){ var i=src+x*4; var lum=(0.299*data[i]+0.587*data[i+1]+0.114*data[i+2])|0; if(lum>255)lum=255; b[p+x]=lum; }
-    }
-    return new Blob([buf],{type:"image/bmp"});
-  }
-
   function downloadCanvasAs(cv, fmt, name){
     var ext = fmt==="png" ? "png" : "bmp";
     var fname = name ? (name.indexOf(".")<0 ? name+"."+ext : name) : filenameFor(fmt);
     if(fmt==="png"){ downloadCanvas(cv, fname); return; }
     var blob;
-    try{ blob = fmt==="bmp8" ? canvasToBMP8(cv) : canvasToBMP24(cv); }
+    try{ blob = canvasToBMP24(cv); }
     catch(err){ alert("Could not build the BMP. Try PNG, or a smaller preset."); return; }
     var url=URL.createObjectURL(blob);
     var a=document.createElement("a"); a.href=url; a.download=fname; a.rel="noopener";
@@ -1815,71 +1746,6 @@ var QRCodeLib = (function(){
     reader.readAsArrayBuffer(file);
   });
 
-  // ---------- Batch export ----------
-  function parseBlocks(text){
-    var raw = (text||"").split(/^\s*-{3,}\s*$/m);
-    var out=[];
-    raw.forEach(function(b){
-      var body = b.replace(/^\n+|\n+$/g,"");
-      if(!body.trim()) return;
-      var lines = body.split("\n");
-      var footer="", mainLines=[];
-      lines.forEach(function(l){
-        if(/^\s*—/.test(l) && l.trim().length>1){ footer=l.trim(); }
-        else mainLines.push(l);
-      });
-      var main = mainLines.join("\n").replace(/^\n+|\n+$/g,"");
-      if(main.trim()) out.push({main:main, foot:footer});
-    });
-    return out;
-  }
-
-  function generateBatch(){
-    var blocks = parseBlocks($("#batchText").value);
-    var gallery=$("#gallery");
-    gallery.innerHTML="";
-    if(!blocks.length){
-      $("#batchActions").style.display="none";
-      $("#batchCount").textContent="add some blocks first";
-      return;
-    }
-    blocks.forEach(function(blk, idx){
-      var item=document.createElement("div"); item.className="thumb";
-      var c=document.createElement("canvas");
-      paint(c, blk.main, blk.foot);
-      var btn=document.createElement("button");
-      btn.textContent="Download "+(idx+1);
-      btn.addEventListener("click",function(){ downloadCanvasAs(c, state.exportFormat, "eink-wallpaper-"+(idx+1)); });
-      item.appendChild(c); item.appendChild(btn);
-      gallery.appendChild(item);
-    });
-    $("#batchActions").style.display="block";
-    $("#batchCount").textContent = blocks.length+(blocks.length===1?" wallpaper":" wallpapers");
-  }
-
-  $("#batchBtn").addEventListener("click", generateBatch);
-
-  $("#batchDownloadAll").addEventListener("click",function(){
-    var canvases = $("#gallery").querySelectorAll("canvas");
-    canvases.forEach(function(c,i){
-      setTimeout(function(){ downloadCanvasAs(c, state.exportFormat, "eink-wallpaper-"+(i+1)); }, i*400);
-    });
-  });
-
-  $("#batchOpenAll").addEventListener("click",function(){
-    var canvases = $("#gallery").querySelectorAll("canvas");
-    if(!canvases.length) return;
-    var win = window.open("");
-    if(!win || !win.document){ alert("Your browser blocked the pop-up. Allow pop-ups and try again."); return; }
-    var html='<!doctype html><title>Batch wallpapers</title>'+
-      '<body style="margin:0;background:#141414;display:flex;flex-wrap:wrap;gap:16px;padding:16px;justify-content:center;align-items:flex-start">';
-    canvases.forEach(function(c){
-      html+='<img src="'+c.toDataURL("image/png")+'" style="max-height:82vh;max-width:45%;box-shadow:0 8px 30px rgba(0,0,0,.5)">';
-    });
-    html+='</body>';
-    win.document.write(html); win.document.close();
-  });
-
   // ---------- Saved looks ----------
   var STORE_KEY="eink_presets_v1";
   var memStore={}, persistent=true;
@@ -1899,12 +1765,12 @@ var QRCodeLib = (function(){
       presetIdx:state.presetIdx, font:state.font, style:state.style, size:state.size,
       align:state.align, vpos:state.vpos, margin:state.margin, theme:state.theme,
       orientation:state.orientation, template:state.template,
-      border:state.border, rule:state.rule, dither:state.dither,
+      border:state.border, rule:state.rule,
       qrpos:state.qrpos, qrsize:state.qrsize,
       imgFit:state.imgFit, imgMode:state.imgMode, imgBright:state.imgBright, imgContrast:state.imgContrast, imgFade:state.imgFade,
-      imgGamma:state.imgGamma, imgSharpen:state.imgSharpen,
+      imgSharpen:state.imgSharpen,
       imgZoom:state.imgZoom, imgPanX:state.imgPanX, imgPanY:state.imgPanY,
-      imgBlack:state.imgBlack, imgWhite:state.imgWhite, imgThreshold:state.imgThreshold, imgVignette:state.imgVignette, imgRound:state.imgRound,
+      imgThreshold:state.imgThreshold, imgVignette:state.imgVignette, imgRound:state.imgRound,
       paperGrain:state.paperGrain,
       autoText:state.autoText, safeZone:state.safeZone,
       exportFormat:state.exportFormat, einkOut:state.einkOut,
@@ -1923,27 +1789,24 @@ var QRCodeLib = (function(){
     state.align=s.align; state.vpos=s.vpos; state.margin=+s.margin||state.margin; state.theme=s.theme;
     if(s.orientation) state.orientation=s.orientation;
     if(s.template) state.template=s.template;
-    state.border=!!s.border; state.rule=!!s.rule; state.dither=!!s.dither;
+    state.border=!!s.border; state.rule=!!s.rule;
     state.qrpos=s.qrpos; state.qrsize=+s.qrsize||state.qrsize;
     if(s.imgFit) state.imgFit=s.imgFit;
-    if(s.imgMode) state.imgMode=s.imgMode;
+    if(s.imgMode) state.imgMode=(s.imgMode==="grey4"?"grey16":s.imgMode);
     if(s.imgBright!=null) state.imgBright=+s.imgBright;
     if(s.imgContrast!=null) state.imgContrast=+s.imgContrast;
     if(s.imgFade!=null) state.imgFade=+s.imgFade;
-    if(s.imgGamma!=null) state.imgGamma=+s.imgGamma;
     if(s.imgSharpen!=null) state.imgSharpen=+s.imgSharpen;
     if(s.imgZoom!=null) state.imgZoom=+s.imgZoom;
     if(s.imgPanX!=null) state.imgPanX=+s.imgPanX;
     if(s.imgPanY!=null) state.imgPanY=+s.imgPanY;
-    if(s.imgBlack!=null) state.imgBlack=+s.imgBlack;
-    if(s.imgWhite!=null) state.imgWhite=+s.imgWhite;
     if(s.imgThreshold!=null) state.imgThreshold=+s.imgThreshold;
     if(s.imgVignette!=null) state.imgVignette=+s.imgVignette;
     if(s.imgRound!=null) state.imgRound=+s.imgRound;
     if(s.paperGrain!=null) state.paperGrain=+s.paperGrain;
     if(s.autoText!=null) state.autoText=!!s.autoText;
     if(s.safeZone!=null) state.safeZone=!!s.safeZone;
-    if(s.exportFormat) state.exportFormat=s.exportFormat;
+    if(s.exportFormat) state.exportFormat=(s.exportFormat==="bmp8"?"bmp24":s.exportFormat);
     if(s.einkOut) state.einkOut=s.einkOut;
     imgCache={canvas:null,key:""};
     if(s.presetIdx!=null && PRESETS[+s.presetIdx]) state.presetIdx=+s.presetIdx;
@@ -1962,13 +1825,10 @@ var QRCodeLib = (function(){
     $("#qrSizeRange").value=state.qrsize; $("#qrSizeVal").textContent=state.qrsize+"%";
     $("#imgBrightRange").value=state.imgBright; $("#imgBrightVal").textContent=state.imgBright;
     $("#imgContrastRange").value=state.imgContrast; $("#imgContrastVal").textContent=state.imgContrast;
-    $("#imgGammaRange").value=state.imgGamma; $("#imgGammaVal").textContent=(state.imgGamma/100).toFixed(2);
     $("#imgSharpenRange").value=state.imgSharpen; $("#imgSharpenVal").textContent=state.imgSharpen;
     $("#imgZoomRange").value=state.imgZoom; $("#imgZoomVal").textContent=(state.imgZoom/100).toFixed(1)+"x";
     $("#imgPanXRange").value=state.imgPanX; $("#imgPanXVal").textContent=state.imgPanX;
     $("#imgPanYRange").value=state.imgPanY; $("#imgPanYVal").textContent=state.imgPanY;
-    $("#imgBlackRange").value=state.imgBlack; $("#imgBlackVal").textContent=state.imgBlack;
-    $("#imgWhiteRange").value=state.imgWhite; $("#imgWhiteVal").textContent=state.imgWhite;
     $("#imgThresholdRange").value=state.imgThreshold; $("#imgThresholdVal").textContent=state.imgThreshold;
     $("#imgVignetteRange").value=state.imgVignette; $("#imgVignetteVal").textContent=state.imgVignette;
     $("#imgRoundRange").value=state.imgRound; $("#imgRoundVal").textContent=state.imgRound;
@@ -1977,7 +1837,6 @@ var QRCodeLib = (function(){
 
     $("#borderChk").checked=state.border;
     $("#ruleChk").checked=state.rule;
-    $("#ditherChk").checked=state.dither;
     $("#autoTextChk").checked=state.autoText;
     $("#safeZoneChk").checked=state.safeZone;
     $("#exportFormat").value=state.exportFormat;
