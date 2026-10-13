@@ -358,6 +358,7 @@ stay hungry.</textarea>
           <button data-template="datecard">Date</button>
           <button data-template="agenda">Agenda</button>
           <button data-template="habit">Habits</button>
+          <button data-template="reading">Reading</button>
         </div>
         <p class="hint" id="templateHint">A single centered quote with optional attribution.</p>
       </div>
@@ -1114,9 +1115,24 @@ var QRCodeLib = (function(){
     var months=["January","February","March","April","May","June","July","August","September","October","November","December"];
     var days=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
     var hh=d.getHours(), mm=d.getMinutes(), ampm=hh>=12?"PM":"AM", h12=hh%12; if(h12===0) h12=12;
+    // ISO 8601 week number
+    var wd=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+    var dn=(wd.getUTCDay()+6)%7; wd.setUTCDate(wd.getUTCDate()-dn+3);
+    var firstThu=wd.getTime(); wd.setUTCMonth(0,1);
+    if(wd.getUTCDay()!==4){ wd.setUTCMonth(0,1+((4-wd.getUTCDay())+7)%7); }
+    var weeknum=1+Math.round((firstThu-wd.getTime())/604800000);
+    // Day of year
+    var doy=Math.floor((d-new Date(d.getFullYear(),0,0))/86400000);
+    // Moon phase (0=new .. 4=full ..), using a known new moon reference
+    var synodic=29.53058867, knownNew=Date.UTC(2000,0,6,18,14)/86400000;
+    var dayn=d.getTime()/86400000, ageFrac=((dayn-knownNew)/synodic)%1; if(ageFrac<0) ageFrac+=1;
+    var moons=["New Moon","Waxing Crescent","First Quarter","Waxing Gibbous","Full Moon","Waning Gibbous","Last Quarter","Waning Crescent"];
+    var moonphase=moons[Math.round(ageFrac*8)%8];
     return {
       day:d.getDate(), weekday:days[d.getDay()], month:months[d.getMonth()],
       year:d.getFullYear(), time:h12+":"+(mm<10?"0"+mm:mm)+" "+ampm,
+      time24:(hh<10?"0"+hh:hh)+":"+(mm<10?"0"+mm:mm),
+      monthnum:d.getMonth()+1, weeknum:weeknum, dayofyear:doy, moonphase:moonphase,
       dateStr:months[d.getMonth()]+" "+d.getDate()+", "+d.getFullYear(),
       shortdate:(d.getMonth()+1)+"/"+d.getDate()+"/"+d.getFullYear()
     };
@@ -1127,8 +1143,10 @@ var QRCodeLib = (function(){
     if(!str || str.indexOf("{")<0) return str;
     var p=dateParts();
     var map={ "{date}":p.dateStr, "{shortdate}":p.shortdate, "{weekday}":p.weekday,
-      "{day}":String(p.day), "{month}":p.month, "{year}":String(p.year), "{time}":p.time };
-    return str.replace(/\{(date|shortdate|weekday|day|month|year|time)\}/g,function(mt){ return map[mt]!=null?map[mt]:mt; });
+      "{day}":String(p.day), "{month}":p.month, "{year}":String(p.year), "{time}":p.time,
+      "{time24}":p.time24, "{monthnum}":String(p.monthnum), "{weeknum}":String(p.weeknum),
+      "{dayofyear}":String(p.dayofyear), "{moonphase}":p.moonphase };
+    return str.replace(/\{(date|shortdate|weekday|day|month|year|time24|time|monthnum|weeknum|dayofyear|moonphase)\}/g,function(mt){ return map[mt]!=null?map[mt]:mt; });
   }
 
   function dfont(weight,px){ return weight+" "+px+"px "+FONTS[state.font]; }
@@ -1158,6 +1176,47 @@ var QRCodeLib = (function(){
     if(state.template==="datecard") drawDateCard(g,w,h,m,fg,accent,mainText,footText);
     else if(state.template==="agenda") drawAgenda(g,w,h,m,fg,accent,mainText);
     else if(state.template==="habit") drawHabit(g,w,h,m,fg,accent,mainText);
+    else if(state.template==="reading") drawReading(g,w,h,m,fg,accent,mainText);
+  }
+
+  // Shrink a font until the text fits maxW (down to minPx), returning the chosen px.
+  function fitText(g,text,maxW,weight,startPx,minPx){
+    var px=startPx; g.font=dfont(weight,px);
+    while(px>minPx && g.measureText(text).width>maxW){ px-=2; g.font=dfont(weight,px); }
+    return px;
+  }
+
+  function drawReading(g,w,h,m,fg,accent,mainText){
+    var mind=Math.min(w,h), cx=w/2;
+    var lines=(mainText||"").split("\n").filter(function(s){return s.trim();});
+    var pct=null, pageStr="", kept=[];
+    for(var i=0;i<lines.length;i++){
+      var ln=lines[i].trim(), mt;
+      if(pct===null && (mt=ln.match(/^(\d+)\s*(?:\/|of)\s*(\d+)$/i))){
+        var cur=+mt[1], tot=+mt[2]; if(tot>0){ pct=Math.max(0,Math.min(1,cur/tot)); pageStr="Page "+cur+" of "+tot; } continue;
+      }
+      if(pct===null && (mt=ln.match(/^(\d+(?:\.\d+)?)\s*%$/))){ pct=Math.max(0,Math.min(1,(+mt[1])/100)); continue; }
+      kept.push(ln);
+    }
+    if(pct===null) pct=0;
+    var title=kept[0]||"Now Reading", author=kept[1]||"";
+    // Progress ring
+    var cy=h*0.37, R=mind*0.25, lw=Math.max(6,Math.round(R*0.16));
+    g.lineCap="round";
+    g.strokeStyle=accent; g.globalAlpha=0.28; g.lineWidth=lw;
+    g.beginPath(); g.arc(cx,cy,R,0,Math.PI*2); g.stroke(); g.globalAlpha=1;
+    if(pct>0){ g.strokeStyle=fg; g.lineWidth=lw; g.beginPath(); g.arc(cx,cy,R,-Math.PI/2,-Math.PI/2+pct*Math.PI*2); g.stroke(); }
+    g.lineCap="butt";
+    g.textAlign="center"; g.textBaseline="middle"; g.fillStyle=fg;
+    g.font=dfont("700",Math.round(R*0.52));
+    g.fillText(Math.round(pct*100)+"%", cx, cy);
+    // Title / author / page
+    g.textBaseline="alphabetic";
+    var ty=cy+R+mind*0.11;
+    var tPx=fitText(g,title,w-2*m,"700",Math.round(mind*0.058),Math.round(mind*0.03));
+    g.fillStyle=fg; g.font=dfont("700",tPx); g.fillText(title,cx,ty); ty+=tPx*0.72+mind*0.03;
+    if(author){ var aPx=fitText(g,author,w-2*m,"400",Math.round(mind*0.040),Math.round(mind*0.026)); g.fillStyle=accent; g.font=dfont("400",aPx); g.fillText(author,cx,ty); ty+=aPx+mind*0.028; }
+    if(pageStr){ g.fillStyle=accent; g.font=dfont("400",Math.round(mind*0.032)); g.fillText(pageStr,cx,ty); }
   }
 
   function drawDateCard(g,w,h,m,fg,accent,mainText,footText){
@@ -1547,7 +1606,8 @@ var QRCodeLib = (function(){
     quote:"A single centered quote with optional attribution.",
     datecard:"Big auto date. Main text = subtitle lines; attribution = footer.",
     agenda:"One to-do per line. Start a line with [x] to show it checked and struck through; blank slots become ruled lines.",
-    habit:"One habit per line, with the current week + today highlighted. Add ticks after a | — e.g. “Floss | x x . x . . .” (x = done)."
+    habit:"One habit per line, with the current week + today highlighted. Add ticks after a | — e.g. “Floss | x x . x . . .” (x = done).",
+    reading:"Line 1 = book title, line 2 = author. Add a line like “142/320” or “44%” to fill the progress ring."
   };
   $("#templateSeg").addEventListener("click",function(e){
     var b=e.target.closest("button"); if(!b) return;
@@ -1726,8 +1786,9 @@ var QRCodeLib = (function(){
   });
 
   // ---------- Version, changelog & share image ----------
-  var VERSION="1.5";
+  var VERSION="1.6";
   var CHANGELOG=[
+    ["1.6","Reading-progress layout with a percentage ring; new tokens: week number, day of year, moon phase, 24-hour time, numeric month."],
     ["1.5","2× supersampled export, smooth-vs-e-ink compare preview, copy to clipboard, favicon & share image."],
     ["1.4","Streamlined the panels; dropped batch export, 4-level, dither texture, gamma and level sliders; BMP export is 24-bit only."],
     ["1.3","Dashboard layouts (Quote / Date / Agenda / Habits), template tokens, agenda check-off and habit ticks."],
