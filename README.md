@@ -19,13 +19,28 @@ Pick your device and the canvas is sized to its native resolution:
 Toggle **portrait / landscape** on any preset.
 
 ### Text wallpapers
-- Four layout templates: **Quote**, **Date**, **Agenda**, **Habits**
-- **Template tokens** resolved live: `{date}`, `{weekday}`, `{day}`, `{month}`, `{year}`, `{time}`, `{shortdate}`
-- **Agenda** — mark items done by starting a line with `[x]` (renders a strikethrough)
-- **Habits** — tick a row with `Label | x x . x . . .` (filled vs. empty cells)
+- Five layout templates: **Quote**, **Date**, **Agenda**, **Habits**, **Reading**
 - Built-in fonts plus **custom font upload** (any `.ttf`/`.otf`/`.woff`)
 - Control style, size, alignment, vertical position, and margin
 - **Surprise me** button to shuffle a fresh look
+
+#### Template tokens
+Resolved live from the device clock when you generate the image:
+
+| Token | Example |
+|---|---|
+| `{date}` | October 12, 2026 |
+| `{shortdate}` | 10/12/2026 |
+| `{weekday}` | Monday |
+| `{day}` `{month}` `{monthnum}` `{year}` | 12 · October · 10 · 2026 |
+| `{time}` `{time24}` | 10:15 PM · 22:15 |
+| `{weeknum}` `{dayofyear}` | 42 · 285 |
+| `{moonphase}` | Waxing Gibbous |
+
+#### Layout syntax
+- **Agenda** — one to-do per line. Start a line with `[x]` to show it checked and struck through; empty slots become ruled lines.
+- **Habits** — one habit per line, current week + today highlighted. Add ticks after a `|` — e.g. `Floss | x x . x . . .` (`x` = done).
+- **Reading** — line 1 = title, line 2 = author. Add a line like `142/320` (or `44%`) to fill a circular progress ring showing the percentage and page count.
 
 ### Finish
 - Light or dark theme
@@ -67,6 +82,8 @@ Turn on **Compare smooth vs e-ink** to split the preview side by side — the sm
 3. On the X3, set it as your custom sleep/wallpaper image.
 
 > If a photo looks grainy on-device, start from a higher-resolution source and try the **16-level** look or turn on **E-ink render**. Use **Compare smooth vs e-ink** to preview the result first.
+
+> Tokens like `{moonphase}` and `{weeknum}` are a snapshot of the moment you generate the image — regenerate to refresh them.
 
 ## Repo files
 
