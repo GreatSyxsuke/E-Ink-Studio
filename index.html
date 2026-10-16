@@ -203,6 +203,7 @@ stay hungry.</textarea>
           <input type="text" id="footText" placeholder="— someone worth quoting" value="— Whole Earth Catalog">
         </label>
         <p class="hint">Tokens filled in when you generate: <code>{date}</code> <code>{weekday}</code> <code>{day}</code> <code>{month}</code> <code>{year}</code> <code>{time}</code></p>
+        <button class="btn-ghost" id="exampleBtn" style="margin-top:2px;">🎲 Insert example</button>
       </div>
 
       <div class="card">
@@ -359,6 +360,7 @@ stay hungry.</textarea>
           <button data-template="agenda">Agenda</button>
           <button data-template="habit">Habits</button>
           <button data-template="reading">Reading</button>
+          <button data-template="week">Week</button>
         </div>
         <p class="hint" id="templateHint">A single centered quote with optional attribution.</p>
       </div>
@@ -475,6 +477,7 @@ stay hungry.</textarea>
             <option value="bmp24">BMP · 24-bit (e-ink wallpaper)</option>
           </select>
         </label>
+        <p class="hint" id="exportHint" style="display:none;margin-top:-4px;"></p>
         <label class="field" style="margin-bottom:10px;">
           <span class="field-label">E-ink render (match the panel)</span>
           <select id="einkOut">
@@ -1177,6 +1180,49 @@ var QRCodeLib = (function(){
     else if(state.template==="agenda") drawAgenda(g,w,h,m,fg,accent,mainText);
     else if(state.template==="habit") drawHabit(g,w,h,m,fg,accent,mainText);
     else if(state.template==="reading") drawReading(g,w,h,m,fg,accent,mainText);
+    else if(state.template==="week") drawWeek(g,w,h,m,fg,accent,mainText);
+  }
+
+  // Truncate text with an ellipsis so it never spills past maxW.
+  function ellip(g,text,maxW){
+    if(g.measureText(text).width<=maxW) return text;
+    var t=text;
+    while(t.length>1 && g.measureText(t+"…").width>maxW) t=t.slice(0,-1);
+    return t+"…";
+  }
+
+  function drawWeek(g,w,h,m,fg,accent,mainText){
+    var mind=Math.min(w,h), dp=dateParts(), now=new Date();
+    var dow=(now.getDay()+6)%7;               // 0 = Monday
+    var ws=new Date(now); ws.setDate(now.getDate()-dow);
+    var abbr=["MON","TUE","WED","THU","FRI","SAT","SUN"], keys=["mon","tue","wed","thu","fri","sat","sun"];
+    var notes={}, lines=(mainText||"").split("\n");
+    for(var i=0;i<lines.length;i++){
+      var mt=lines[i].match(/^\s*([A-Za-z]{3,9})\s*[:\-]\s*(.+)$/);
+      if(mt){ var k=mt[1].slice(0,3).toLowerCase(); if(keys.indexOf(k)>=0) notes[k]=mt[2].trim(); }
+    }
+    g.textAlign="left"; g.textBaseline="alphabetic";
+    var hPx=Math.round(mind*0.058), subPx=Math.round(mind*0.03);
+    g.fillStyle=fg; g.font=dfont("700",hPx); g.fillText("This Week", m, m+hPx);
+    g.fillStyle=accent; g.font=dfont("400",subPx); g.fillText(dp.month+" "+dp.year, m, m+hPx+subPx*1.5);
+    var top=m+hPx+subPx*1.5+Math.round(mind*0.055);
+    var rowH=(h-m-top)/7, innerW=w-2*m;
+    var numX=m+innerW*0.15, noteX=m+innerW*0.27, noteMaxW=(w-m)-noteX-mind*0.03;
+    var dayPx=Math.round(mind*0.032), numPx=Math.round(mind*0.03), notePx=Math.round(mind*0.034);
+    for(var r=0;r<7;r++){
+      var d2=new Date(ws); d2.setDate(ws.getDate()+r);
+      var cy=top+rowH*(r+0.5), isToday=(d2.toDateString()===now.toDateString());
+      g.strokeStyle=accent; g.globalAlpha=0.2; g.lineWidth=Math.max(1,Math.round(mind*0.002));
+      g.beginPath(); g.moveTo(m, top+rowH*r); g.lineTo(w-m, top+rowH*r); g.stroke(); g.globalAlpha=1;
+      g.textAlign="left"; g.textBaseline="middle";
+      g.fillStyle=isToday?fg:accent; g.font=dfont(isToday?"700":"600",dayPx); g.fillText(abbr[r], m, cy);
+      g.fillStyle=fg; g.font=dfont(isToday?"700":"400",numPx); g.fillText(String(d2.getDate()), numX, cy);
+      var note=notes[keys[r]]||"";
+      if(note){ g.fillStyle=fg; g.font=dfont(isToday?"700":"400",notePx); g.fillText(ellip(g,note,noteMaxW), noteX, cy); }
+      if(isToday){ g.fillStyle=accent; g.beginPath(); g.arc(w-m-mind*0.015, cy, mind*0.011, 0, Math.PI*2); g.fill(); }
+    }
+    g.strokeStyle=accent; g.globalAlpha=0.2; g.lineWidth=Math.max(1,Math.round(mind*0.002));
+    g.beginPath(); g.moveTo(m, top+rowH*7); g.lineTo(w-m, top+rowH*7); g.stroke(); g.globalAlpha=1;
   }
 
   // Shrink a font until the text fits maxW (down to minPx), returning the chosen px.
@@ -1607,7 +1653,8 @@ var QRCodeLib = (function(){
     datecard:"Big auto date. Main text = subtitle lines; attribution = footer.",
     agenda:"One to-do per line. Start a line with [x] to show it checked and struck through; blank slots become ruled lines.",
     habit:"One habit per line, with the current week + today highlighted. Add ticks after a | — e.g. “Floss | x x . x . . .” (x = done).",
-    reading:"Line 1 = book title, line 2 = author. Add a line like “142/320” or “44%” to fill the progress ring."
+    reading:"Line 1 = book title, line 2 = author. Add a line like “142/320” or “44%” to fill the progress ring.",
+    week:"A 7-day week with today highlighted. Add notes like “Mon: Dentist 3pm” (Mon–Sun)."
   };
   $("#templateSeg").addEventListener("click",function(e){
     var b=e.target.closest("button"); if(!b) return;
@@ -1629,11 +1676,29 @@ var QRCodeLib = (function(){
   $("#marginRange").addEventListener("input",function(e){ state.margin=+e.target.value; $("#marginVal").textContent=e.target.value+"%"; render(); });
   $("#qrSizeRange").addEventListener("input",function(e){ state.qrsize=+e.target.value; $("#qrSizeVal").textContent=e.target.value+"%"; render(); });
 
+  // Per-device export default + a short install hint, keyed off the preset name.
+  function deviceProfile(){
+    var n=PRESETS[state.presetIdx].name;
+    if(/^XTEink/.test(n)) return {fmt:"bmp24", hint:"XTEink: export BMP, copy it to the reader, then set it as your custom sleep screen."};
+    if(/^Kobo/.test(n)) return {fmt:"png", hint:"Kobo: export PNG, connect by USB and drop it in the “.kobo/screensaver” folder, then enable the sleep screensaver."};
+    return {fmt:null, hint:""};
+  }
+  function updateExportHint(){
+    var p=deviceProfile(), el=$("#exportHint");
+    el.textContent=p.hint; el.style.display=p.hint?"block":"none";
+  }
+  function applyDeviceDefault(){
+    var p=deviceProfile();
+    if(p.fmt){ state.exportFormat=p.fmt; $("#exportFormat").value=p.fmt; }
+    updateExportHint();
+  }
+
   presetSel.addEventListener("change",function(e){
     state.presetIdx=+e.target.value;
     var pp=PRESETS[state.presetIdx];
     $("#customDims").style.display = pp.custom ? "grid" : "none";
     if(!pp.custom){ state.orientation = pp.w>pp.h ? "landscape" : "portrait"; setSeg("#orientSeg","orientation","orient",state.orientation); }
+    applyDeviceDefault();
     render();
   });
 
@@ -1786,8 +1851,9 @@ var QRCodeLib = (function(){
   });
 
   // ---------- Version, changelog & share image ----------
-  var VERSION="1.6";
+  var VERSION="1.7";
   var CHANGELOG=[
+    ["1.7","Week-at-a-glance layout, a goofy example library (Insert example), and per-device export defaults with install hints."],
     ["1.6","Reading-progress layout with a percentage ring; new tokens: week number, day of year, moon phase, 24-hour time, numeric month."],
     ["1.5","2× supersampled export, smooth-vs-e-ink compare preview, copy to clipboard, favicon & share image."],
     ["1.4","Streamlined the panels; dropped batch export, 4-level, dither texture, gamma and level sliders; BMP export is 24-bit only."],
@@ -2045,6 +2111,7 @@ var QRCodeLib = (function(){
     $("#autoTextChk").checked=state.autoText;
     $("#safeZoneChk").checked=state.safeZone;
     $("#exportFormat").value=state.exportFormat;
+    updateExportHint();
     $("#einkOut").value=state.einkOut;
 
     setSeg("#fontSeg","font","font",state.font);
@@ -2131,6 +2198,28 @@ var QRCodeLib = (function(){
     {t:"Begin\nanywhere.", f:"— John Cage"}
   ];
   var FONTKEYS=["serif","geo","mono"], STYLES=["regular","bold","upper"], THEMEKEYS=["light","dark","gray"], VPOS=["top","middle","bottom"];
+
+  // Goofy starter sets for the "Insert example" button, matched to the active template.
+  var JOKE_AGENDA=[
+    "[x] Wake up (nailed it)\n[x] Make coffee\nPretend to meditate\nOverthink one email\nSnack reconnaissance\n[x] Close three tabs, open five",
+    "[x] Feed the sourdough\nWater the one surviving plant\nLose exactly one sock\nRehearse witty comeback\n[x] Nap, aggressively\nAvoid the group chat",
+    "Reply to Tuesday's text\n[x] Stand near the gym\nDrink water, resent it\nStart a book, finish a snack\n[x] Touch grass briefly\nPlan tomorrow (optimistic)"
+  ];
+  var JOKE_HABIT=[
+    "Hydrate | x x . x . . .\nTouch grass | . x . . x . .\nDoomscroll less | x . x . . . .\nFloss (allegedly) | x . . . . . .",
+    "Go to bed on time | . . x . . . .\nWater not coffee | x x . . . . .\nStretch like a cat | x . x . x . .\nNo snacks after 9 | . . . x . . .",
+    "Read 10 pages | x x x . x . .\nInbox zero (lol) | . . . . x . .\nWalk the dog | x x x x x x x\nMeditate 1 min | x . . x . . ."
+  ];
+  var READING_EX=[
+    "The Hobbit\nJ.R.R. Tolkien\n152/310",
+    "Dune\nFrank Herbert\n58%",
+    "Project Hail Mary\nAndy Weir\n204/476",
+    "The Name of the Wind\nPatrick Rothfuss\n33%"
+  ];
+  var WEEK_EX=[
+    "Mon: Gym before work\nTue: Dentist 3pm\nWed: Deep work, no meetings\nThu: Call Mom\nFri: Pizza night\nSat: Long hike\nSun: Reset & plan",
+    "Mon: Reenter society\nTue: Reply to Thursday's email\nWed: Peak of the week (allegedly)\nThu: Snack summit\nFri: Celebrate surviving\nSat: Do nothing, expertly\nSun: Dread, gently"
+  ];
   $("#randomBtn").addEventListener("click",function(){
     var q=QUOTES[Math.floor(Math.random()*QUOTES.length)];
     $("#mainText").value=q.t; $("#footText").value=q.f;
@@ -2144,6 +2233,17 @@ var QRCodeLib = (function(){
     render();
   });
   function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+
+  // Fill the text with a random starter matched to the current template.
+  $("#exampleBtn").addEventListener("click",function(){
+    var t=state.template;
+    if(t==="agenda"){ $("#mainText").value=pick(JOKE_AGENDA); $("#footText").value=""; }
+    else if(t==="habit"){ $("#mainText").value=pick(JOKE_HABIT); $("#footText").value=""; }
+    else if(t==="reading"){ $("#mainText").value=pick(READING_EX); $("#footText").value=""; }
+    else if(t==="week"){ $("#mainText").value=pick(WEEK_EX); $("#footText").value=""; }
+    else { var q=pick(QUOTES); $("#mainText").value=q.t; $("#footText").value=q.f; } // quote + datecard
+    render();
+  });
   function setSeg(sel,key,attr,val){
     var seg=$(sel);
     seg.querySelectorAll("button").forEach(function(b){
@@ -2153,6 +2253,7 @@ var QRCodeLib = (function(){
 
   setupPWA();
   renderPresetList();
+  applyDeviceDefault();
   render();
   setTimeout(render,120);
   if(document.fonts && document.fonts.ready){ document.fonts.ready.then(render); }
