@@ -19,28 +19,30 @@ Pick your device and the canvas is sized to its native resolution:
 Toggle **portrait / landscape** on any preset.
 
 ### Text wallpapers
-- Five layout templates: **Quote**, **Date**, **Agenda**, **Habits**, **Reading**
+- Six layout templates: **Quote**, **Date**, **Agenda**, **Habits**, **Reading**, **Week**
+- **Insert example** (🎲) drops in a random starter matched to the current template — quotes, goofy to-do lists, joke habit grids, a book with progress, or a full week of plans
+- **Surprise me** shuffles the whole look (font, theme, size, position)
 - Built-in fonts plus **custom font upload** (any `.ttf`/`.otf`/`.woff`)
 - Control style, size, alignment, vertical position, and margin
-- **Surprise me** button to shuffle a fresh look
 
 #### Template tokens
 Resolved live from the device clock when you generate the image:
 
 | Token | Example |
 |---|---|
-| `{date}` | October 12, 2026 |
-| `{shortdate}` | 10/12/2026 |
-| `{weekday}` | Monday |
-| `{day}` `{month}` `{monthnum}` `{year}` | 12 · October · 10 · 2026 |
-| `{time}` `{time24}` | 10:15 PM · 22:15 |
-| `{weeknum}` `{dayofyear}` | 42 · 285 |
+| `{date}` | October 16, 2026 |
+| `{shortdate}` | 10/16/2026 |
+| `{weekday}` | Friday |
+| `{day}` `{month}` `{monthnum}` `{year}` | 16 · October · 10 · 2026 |
+| `{time}` `{time24}` | 5:20 PM · 17:20 |
+| `{weeknum}` `{dayofyear}` | 42 · 289 |
 | `{moonphase}` | Waxing Gibbous |
 
 #### Layout syntax
 - **Agenda** — one to-do per line. Start a line with `[x]` to show it checked and struck through; empty slots become ruled lines.
 - **Habits** — one habit per line, current week + today highlighted. Add ticks after a `|` — e.g. `Floss | x x . x . . .` (`x` = done).
 - **Reading** — line 1 = title, line 2 = author. Add a line like `142/320` (or `44%`) to fill a circular progress ring showing the percentage and page count.
+- **Week** — a 7-day week (Mon–Sun) with today highlighted. Add notes with `Mon: Dentist 3pm` for any day.
 
 ### Finish
 - Light or dark theme
@@ -65,8 +67,9 @@ Optionally quantize the whole composition to the panel's depth (1-bit Floyd / At
 Turn on **Compare smooth vs e-ink** to split the preview side by side — the smooth composite next to what the panel will actually show — so you can judge grain before exporting.
 
 ### Export
-- **PNG** — for sharing or phone lock screens
+- **PNG** — for sharing, phone lock screens, and Kobo screensavers
 - **24-bit BMP** — the format the XTEink readers accept for custom wallpapers
+- **Per-device defaults** — picking an XTEink preset defaults to BMP, Kobo defaults to PNG, each with a short install hint
 - Exports are **rendered at 2× and downscaled** for crisper text and edges, then dithered at true panel resolution (1-bit photo looks render at native size to stay sharp)
 - **Copy image to clipboard** for quick pasting, alongside Download and Open-in-new-tab
 
@@ -75,11 +78,17 @@ Turn on **Compare smooth vs e-ink** to split the preview side by side — the sm
 - **Save this app** exports a standalone copy of the tool itself
 - Add to Home Screen on iOS/Android for an app-like launch
 
-## Using it on the X3
+## Using it on your device
 
+**XTEink (X3 / X4):**
 1. Open the live link in **Safari** (not the Files app preview — that won't run the tool).
 2. Build your wallpaper and export as **24-bit BMP**.
-3. On the X3, set it as your custom sleep/wallpaper image.
+3. Copy it to the reader and set it as your custom sleep/wallpaper image.
+
+**Kobo (Libra 2, etc.):**
+1. Build your wallpaper and export as **PNG**.
+2. Connect by USB and drop it in the `.kobo/screensaver` folder.
+3. Enable the sleep screensaver in settings.
 
 > If a photo looks grainy on-device, start from a higher-resolution source and try the **16-level** look or turn on **E-ink render**. Use **Compare smooth vs e-ink** to preview the result first.
 
