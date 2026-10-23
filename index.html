@@ -361,6 +361,7 @@ stay hungry.</textarea>
           <button data-template="habit">Habits</button>
           <button data-template="reading">Reading</button>
           <button data-template="week">Week</button>
+          <button data-template="card">Sign-out</button>
         </div>
         <p class="hint" id="templateHint">A single centered quote with optional attribution.</p>
       </div>
@@ -1181,6 +1182,101 @@ var QRCodeLib = (function(){
     else if(state.template==="habit") drawHabit(g,w,h,m,fg,accent,mainText);
     else if(state.template==="reading") drawReading(g,w,h,m,fg,accent,mainText);
     else if(state.template==="week") drawWeek(g,w,h,m,fg,accent,mainText);
+    else if(state.template==="card") drawCard(g,w,h,m,fg,accent,mainText,footText);
+  }
+
+  function drawCard(g,w,h,m,fg,accent,mainText,footText){
+    var mind=Math.min(w,h);
+    // Parse: "# A | B | C" renames columns, "x | y" lines are rows,
+    // "Label: value" lines are header fields, plain lines fill Title then Author.
+    var lines=(mainText||"").split("\n"), fields=[], plain=[], rows=[], heads=null;
+    function trimAll(a){ for(var t=0;t<a.length;t++) a[t]=a[t].trim(); return a; }
+    for(var i=0;i<lines.length;i++){
+      var ln=lines[i].trim(), mt; if(!ln) continue;
+      if(ln.charAt(0)==="#" && ln.indexOf("|")>=0){ heads=trimAll(ln.slice(1).split("|")); continue; }
+      if(ln.indexOf("|")>=0){ rows.push(trimAll(ln.split("|"))); continue; }
+      if((mt=ln.match(/^([A-Za-z][A-Za-z .']{0,13}):\s*(.+)$/))){ fields.push([mt[1].toUpperCase(),mt[2]]); continue; }
+      plain.push(ln);
+    }
+    if(plain[0]) fields.unshift(["TITLE",plain[0]]);
+    if(plain[1]) fields.splice(1,0,["AUTHOR",plain[1]]);
+    if(!fields.length) fields=[["TITLE",""],["AUTHOR",""]];
+    fields=fields.slice(0,3);
+    var cols=2;
+    for(var r0=0;r0<rows.length;r0++) if(rows[r0].length>=3) cols=3;
+    if(heads && heads.length>=3) cols=3;
+    var defHeads=["DATE DUE","BORROWER'S NAME","RETURNED"];
+    var H=[]; for(var c0=0;c0<cols;c0++) H.push(((heads&&heads[c0])||defHeads[c0]).toUpperCase());
+
+    // Card frame: heavy outer rule + thin inner rule
+    var x0=m, y0=m, cw=w-2*m, ch=h-2*m, pad=mind*0.05;
+    g.strokeStyle=fg; g.lineWidth=Math.max(2,Math.round(mind*0.006)); g.strokeRect(x0,y0,cw,ch);
+    var ins=mind*0.014; g.lineWidth=Math.max(1,Math.round(mind*0.002));
+    g.strokeRect(x0+ins,y0+ins,cw-2*ins,ch-2*ins);
+    var L=x0+pad, R=x0+cw-pad, thin=Math.max(1,Math.round(mind*0.002));
+
+    // Header fields
+    var y=y0+pad+mind*0.03, labPx=Math.round(mind*0.024), labW=mind*0.16;
+    g.textAlign="left"; g.textBaseline="alphabetic";
+    for(var f=0;f<fields.length;f++){
+      var vStart=Math.round(mind*(f===0?0.052:0.038)), vMin=Math.round(mind*0.024);
+      g.fillStyle=accent; g.font=dfont("600",labPx); g.fillText(fields[f][0],L,y);
+      var vx=L+labW, vPx=fitText(g,fields[f][1],R-vx,f===0?"700":"400",vStart,vMin);
+      g.fillStyle=fg; g.font=dfont(f===0?"700":"400",vPx); g.fillText(ellip(g,fields[f][1],R-vx),vx,y);
+      g.strokeStyle=accent; g.lineWidth=thin; g.beginPath(); g.moveTo(vx,y+mind*0.012); g.lineTo(R,y+mind*0.012); g.stroke();
+      y+=mind*0.085;
+    }
+
+    // Footer note + punch hole along the bottom edge
+    var holeR=mind*0.022, holeCy=y0+ch-pad*0.6-holeR;
+    g.strokeStyle=fg; g.lineWidth=thin; g.beginPath(); g.arc(w/2,holeCy,holeR,0,Math.PI*2); g.stroke();
+    var footPx=Math.round(mind*0.022), footBase=holeCy-holeR-mind*0.025;
+    var foot=(footText||"").replace(/^—\s*/,"") || "PLEASE DO NOT REMOVE CARD FROM POCKET";
+    g.textAlign="center"; g.fillStyle=accent; g.font=dfont("600",footPx);
+    g.fillText(ellip(g,foot.toUpperCase(),R-L),w/2,footBase);
+
+    // Table: heavy top rule, column header, ruled rows down to the footer
+    var tTop=y-mind*0.02, headH=mind*0.06, rowH=mind*0.072;
+    var tBot=footBase-footPx-mind*0.03;
+    var nRows=Math.max(1,Math.floor((tBot-tTop-headH)/rowH)); tBot=tTop+headH+nRows*rowH;
+    var tw=R-L, fr=cols===3?[0.27,0.48,0.25]:[0.32,0.68], cx=[L];
+    for(var k=0;k<cols;k++) cx.push(cx[k]+tw*fr[k]);
+    g.strokeStyle=fg; g.lineWidth=Math.max(2,Math.round(mind*0.004));
+    g.beginPath(); g.moveTo(L,tTop); g.lineTo(R,tTop); g.moveTo(L,tTop+headH); g.lineTo(R,tTop+headH); g.stroke();
+    g.textBaseline="middle"; g.fillStyle=fg;
+    var hPx=Math.round(mind*0.024);
+    for(var c1=0;c1<cols;c1++){
+      g.font=dfont("700",hPx); g.textAlign="center";
+      g.fillText(ellip(g,H[c1],cx[c1+1]-cx[c1]-mind*0.02),(cx[c1]+cx[c1+1])/2,tTop+headH/2);
+    }
+    g.lineWidth=thin;
+    for(var c2=1;c2<cols;c2++){ g.beginPath(); g.moveTo(cx[c2],tTop); g.lineTo(cx[c2],tBot); g.stroke(); }
+    for(var rr=1;rr<=nRows;rr++){
+      g.strokeStyle=accent; g.globalAlpha=0.45;
+      g.beginPath(); g.moveTo(L,tTop+headH+rr*rowH); g.lineTo(R,tTop+headH+rr*rowH); g.stroke(); g.globalAlpha=1;
+    }
+
+    // Entries: dates look rubber-stamped (mono caps, a little crooked), names look written (italic)
+    var cellPad=mind*0.018, stampPx=Math.round(mind*0.03), namePx=Math.round(mind*0.038), notePx=Math.round(mind*0.03);
+    for(var e=0;e<Math.min(rows.length,nRows);e++){
+      var row=rows[e], cy=tTop+headH+(e+0.5)*rowH;
+      if(row[0]){
+        g.save(); g.translate((cx[0]+cx[1])/2,cy); g.rotate(((e*37)%7-3)*0.012);
+        g.textAlign="center"; g.fillStyle=fg; g.globalAlpha=0.85;
+        g.font="600 "+stampPx+"px "+FONTS.mono;
+        g.fillText(ellip(g,row[0].toUpperCase(),cx[1]-cx[0]-cellPad*2),0,0);
+        g.restore();
+      }
+      if(row[1]){
+        g.textAlign="left"; g.fillStyle=fg; g.font=dfont("italic 400",namePx);
+        g.fillText(ellip(g,row[1],cx[2]-cx[1]-cellPad*2),cx[1]+cellPad,cy);
+      }
+      if(cols===3 && row[2]){
+        g.textAlign="center"; g.fillStyle=fg; g.font=dfont("italic 400",notePx);
+        g.fillText(ellip(g,row[2],cx[3]-cx[2]-cellPad*2),(cx[2]+cx[3])/2,cy);
+      }
+    }
+    g.textAlign="left"; g.textBaseline="alphabetic";
   }
 
   // Truncate text with an ellipsis so it never spills past maxW.
@@ -1654,7 +1750,8 @@ var QRCodeLib = (function(){
     agenda:"One to-do per line. Start a line with [x] to show it checked and struck through; blank slots become ruled lines.",
     habit:"One habit per line, with the current week + today highlighted. Add ticks after a | — e.g. “Floss | x x . x . . .” (x = done).",
     reading:"Line 1 = book title, line 2 = author. Add a line like “142/320” or “44%” to fill the progress ring.",
-    week:"A 7-day week with today highlighted. Add notes like “Mon: Dentist 3pm” (Mon–Sun)."
+    week:"A 7-day week with today highlighted. Add notes like “Mon: Dentist 3pm” (Mon–Sun).",
+    card:"A library sign-out card. Line 1 = title, line 2 = author (or use “Item: Stapler”). Rows: “Oct 3 | Gandalf | Late”. Rename columns with “# Date | Who | Why”."
   };
   $("#templateSeg").addEventListener("click",function(e){
     var b=e.target.closest("button"); if(!b) return;
@@ -1851,8 +1948,9 @@ var QRCodeLib = (function(){
   });
 
   // ---------- Version, changelog & share image ----------
-  var VERSION="1.7";
+  var VERSION="1.8";
   var CHANGELOG=[
+    ["1.8","Sign-out card layout: a library-style card (or any sign-out sheet) with stamped dates, written names, and custom columns."],
     ["1.7","Week-at-a-glance layout, a goofy example library (Insert example), and per-device export defaults with install hints."],
     ["1.6","Reading-progress layout with a percentage ring; new tokens: week number, day of year, moon phase, 24-hour time, numeric month."],
     ["1.5","2× supersampled export, smooth-vs-e-ink compare preview, copy to clipboard, favicon & share image."],
@@ -2220,6 +2318,13 @@ var QRCodeLib = (function(){
     "Mon: Gym before work\nTue: Dentist 3pm\nWed: Deep work, no meetings\nThu: Call Mom\nFri: Pizza night\nSat: Long hike\nSun: Reset & plan",
     "Mon: Reenter society\nTue: Reply to Thursday's email\nWed: Peak of the week (allegedly)\nThu: Snack summit\nFri: Celebrate surviving\nSat: Do nothing, expertly\nSun: Dread, gently"
   ];
+  var CARD_EX=[
+    {t:"The Hobbit\nJ.R.R. Tolkien\nCall No: 823.912 TOL\nSep 21 | Gandalf the Grey | Late\nOct 3 | Bilbo Baggins | Never\nOct 17 | Smaug | Scorched\nNov 1 | Three Hungry Trolls | Eaten\nNov 15 | Gollum | Precious", f:"Wizards will be fined"},
+    {t:"Moby Dick\nHerman Melville\nJan 4 | Captain Ahab | Obsessed\nFeb 12 | Ishmael | Call me\nMar 9 | A Large White Whale | Personal\nApr 1 | You | Never finished", f:"Please return to the sea"},
+    {t:"Item: Office Stapler\nOwner: Accounting Dept.\n# Date | Borrowed By | Excuse\nMon | Dave from IT | It jammed\nTue | Dave again | Lost it\nWed | Definitely not Dave | Moustache\nThu | Milton | My stapler\nFri | Dave | Says it's his now", f:"Stapler must not leave the building"},
+    {t:"Item: The Good Scissors\nLocation: Kitchen Drawer\n# Date | Name | Returned?\nOct 2 | Mom | Yes\nOct 3 | Dad | Ran with them\nOct 4 | The Dog | Chewed\nOct 5 | Nobody, apparently | No", f:"Not for opening packages"},
+    {t:"How to Train Your Cat\nA. Nonymous\nJan 4 | Mr. Whiskers | Never\nFeb 12 | The Cat, Again | Shredded\nMar 9 | Grandma Doris | Yes\nApr 1 | Definitely Not a Cat | Meow", f:"Overdue fines payable in treats"}
+  ];
   $("#randomBtn").addEventListener("click",function(){
     var q=QUOTES[Math.floor(Math.random()*QUOTES.length)];
     $("#mainText").value=q.t; $("#footText").value=q.f;
@@ -2241,6 +2346,7 @@ var QRCodeLib = (function(){
     else if(t==="habit"){ $("#mainText").value=pick(JOKE_HABIT); $("#footText").value=""; }
     else if(t==="reading"){ $("#mainText").value=pick(READING_EX); $("#footText").value=""; }
     else if(t==="week"){ $("#mainText").value=pick(WEEK_EX); $("#footText").value=""; }
+    else if(t==="card"){ var ce=pick(CARD_EX); $("#mainText").value=ce.t; $("#footText").value=ce.f; }
     else { var q=pick(QUOTES); $("#mainText").value=q.t; $("#footText").value=q.f; } // quote + datecard
     render();
   });
