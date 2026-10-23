@@ -19,8 +19,8 @@ Pick your device and the canvas is sized to its native resolution:
 Toggle **portrait / landscape** on any preset.
 
 ### Text wallpapers
-- Six layout templates: **Quote**, **Date**, **Agenda**, **Habits**, **Reading**, **Week**
-- **Insert example** (🎲) drops in a random starter matched to the current template — quotes, goofy to-do lists, joke habit grids, a book with progress, or a full week of plans
+- Seven layout templates: **Quote**, **Date**, **Agenda**, **Habits**, **Reading**, **Week**, **Sign-out**
+- **Insert example** (🎲) drops in a random starter matched to the current template — quotes, goofy to-do lists, joke habit grids, a book with progress, a week of plans, or a silly sign-out card
 - **Surprise me** shuffles the whole look (font, theme, size, position)
 - Built-in fonts plus **custom font upload** (any `.ttf`/`.otf`/`.woff`)
 - Control style, size, alignment, vertical position, and margin
@@ -30,12 +30,12 @@ Resolved live from the device clock when you generate the image:
 
 | Token | Example |
 |---|---|
-| `{date}` | October 16, 2026 |
-| `{shortdate}` | 10/16/2026 |
+| `{date}` | October 23, 2026 |
+| `{shortdate}` | 10/23/2026 |
 | `{weekday}` | Friday |
-| `{day}` `{month}` `{monthnum}` `{year}` | 16 · October · 10 · 2026 |
-| `{time}` `{time24}` | 5:20 PM · 17:20 |
-| `{weeknum}` `{dayofyear}` | 42 · 289 |
+| `{day}` `{month}` `{monthnum}` `{year}` | 23 · October · 10 · 2026 |
+| `{time}` `{time24}` | 12:09 AM · 00:09 |
+| `{weeknum}` `{dayofyear}` | 43 · 296 |
 | `{moonphase}` | Waxing Gibbous |
 
 #### Layout syntax
@@ -43,6 +43,18 @@ Resolved live from the device clock when you generate the image:
 - **Habits** — one habit per line, current week + today highlighted. Add ticks after a `|` — e.g. `Floss | x x . x . . .` (`x` = done).
 - **Reading** — line 1 = title, line 2 = author. Add a line like `142/320` (or `44%`) to fill a circular progress ring showing the percentage and page count.
 - **Week** — a 7-day week (Mon–Sun) with today highlighted. Add notes with `Mon: Dentist 3pm` for any day.
+- **Sign-out** — a library-style sign-out card (or any sign-out sheet), with stamped-looking dates, italic "handwritten" names, and a punch hole.
+  - Line 1 = title, line 2 = author. Or set your own header fields with `Label: value` — e.g. `Item: Office Stapler`, `Call No: 823.912 TOL` (up to three).
+  - Rows: `Oct 3 | Gandalf the Grey`. Add a third value (`| Late`) to get a **Returned** column.
+  - Rename the columns with `# Date | Borrowed By | Excuse`.
+  - The Attribution field becomes the small line at the bottom of the card (defaults to "Please do not remove card from pocket").
+
+```
+The Hobbit
+J.R.R. Tolkien
+Oct 3 | Gandalf the Grey | Late
+Oct 17 | Smaug | Scorched
+```
 
 ### Finish
 - Light or dark theme
