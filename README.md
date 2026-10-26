@@ -19,8 +19,8 @@ Pick your device and the canvas is sized to its native resolution:
 Toggle **portrait / landscape** on any preset.
 
 ### Text wallpapers
-- Seven layout templates: **Quote**, **Date**, **Agenda**, **Habits**, **Reading**, **Week**, **Sign-out**
-- **Insert example** (🎲) drops in a random starter matched to the current template — quotes, goofy to-do lists, joke habit grids, a book with progress, a week of plans, or a silly sign-out card
+- Eight layout templates: **Quote**, **Date**, **Agenda**, **Habits**, **Reading**, **Week**, **Sign-out**, **Stamp**
+- **Insert example** (🎲) drops in a random starter matched to the current template — quotes, goofy to-do lists, joke habit grids, a book with progress, a week of plans, a silly sign-out card, or a librarian stamp
 - **Surprise me** shuffles the whole look (font, theme, size, position)
 - Built-in fonts plus **custom font upload** (any `.ttf`/`.otf`/`.woff`)
 - Control style, size, alignment, vertical position, and margin
@@ -30,13 +30,13 @@ Resolved live from the device clock when you generate the image:
 
 | Token | Example |
 |---|---|
-| `{date}` | October 23, 2026 |
-| `{shortdate}` | 10/23/2026 |
-| `{weekday}` | Friday |
-| `{day}` `{month}` `{monthnum}` `{year}` | 23 · October · 10 · 2026 |
-| `{time}` `{time24}` | 12:09 AM · 00:09 |
-| `{weeknum}` `{dayofyear}` | 43 · 296 |
-| `{moonphase}` | Waxing Gibbous |
+| `{date}` | October 25, 2026 |
+| `{shortdate}` | 10/25/2026 |
+| `{weekday}` | Sunday |
+| `{day}` `{month}` `{monthnum}` `{year}` | 25 · October · 10 · 2026 |
+| `{time}` `{time24}` | 10:48 PM · 22:48 |
+| `{weeknum}` `{dayofyear}` | 43 · 298 |
+| `{moonphase}` | e.g. Waxing Gibbous |
 
 #### Layout syntax
 - **Agenda** — one to-do per line. Start a line with `[x]` to show it checked and struck through; empty slots become ruled lines.
@@ -48,13 +48,24 @@ Resolved live from the device clock when you generate the image:
   - Rows: `Oct 3 | Gandalf the Grey`. Add a third value (`| Late`) to get a **Returned** column.
   - Rename the columns with `# Date | Borrowed By | Excuse`.
   - The Attribution field becomes the small line at the bottom of the card (defaults to "Please do not remove card from pocket").
+- **Stamp** — one big librarian-style ink stamp. Each line of the main text is a line of the stamp; the Attribution field is the date line (tokens like `{shortdate}` work).
 
 ```
 The Hobbit
-J.R.R. Tolkien
+J.R. R. Tolkien
 Oct 3 | Gandalf the Grey | Late
 Oct 17 | Smaug | Scorched
 ```
+
+### Ink stamp
+Use it as the standalone **Stamp** layout, or switch on **Stamp over the current layout** to slam a stamp onto any other template ("OVERDUE" across a sign-out card, "RETURNED" over a quote).
+
+- **Words** for the overlay have their own field, so the layout underneath keeps its text. Use ` / ` for a second line, e.g. `DO NOT / DISTURB`.
+- **Date line** (optional), with token support.
+- **Shape:** **Box** (double border, condensed caps, date under a rule) or **Round** (words along the top and bottom of the ring, stars between, date in the center).
+- **Placement** for the overlay: top, center, or bottom.
+- **Ink wear** adds speckles, dry streaks, and uneven pressure so it looks hand-stamped.
+- **Re-stamp** gives a new tilt and ink pattern. The pattern stays put while you type, and saved looks remember it.
 
 ### Finish
 - Light or dark theme
@@ -99,8 +110,8 @@ Turn on **Compare smooth vs e-ink** to split the preview side by side — the sm
 
 **Kobo (Libra 2, etc.):**
 1. Build your wallpaper and export as **PNG**.
-2. Connect by USB and drop it in the `.kobo/screensaver` folder.
-3. Enable the sleep screensaver in settings.
+2. Connect by USB and drop it in the `.kobo/screensaver` folder (create it if it doesn't exist).
+3. In settings, turn on **Show current read** and **Show book covers full screen**.
 
 > If a photo looks grainy on-device, start from a higher-resolution source and try the **16-level** look or turn on **E-ink render**. Use **Compare smooth vs e-ink** to preview the result first.
 
