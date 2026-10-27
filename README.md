@@ -52,7 +52,7 @@ Resolved live from the device clock when you generate the image:
 
 ```
 The Hobbit
-J.R. R. Tolkien
+J.R.R. Tolkien
 Oct 3 | Gandalf the Grey | Late
 Oct 17 | Smaug | Scorched
 ```
@@ -92,8 +92,9 @@ Turn on **Compare smooth vs e-ink** to split the preview side by side — the sm
 ### Export
 - **PNG** — for sharing, phone lock screens, and Kobo screensavers
 - **24-bit BMP** — the format the XTEink readers accept for custom wallpapers
-- **Per-device defaults** — picking an XTEink preset defaults to BMP, Kobo defaults to PNG, each with a short install hint
-- Exports are **rendered at 2× and downscaled** for crisper text and edges, then dithered at true panel resolution (1-bit photo looks render at native size to stay sharp)
+- **Transparent overlay** (PNG or 32-bit BMP) — saves only your text, stamp, and artwork with no paper behind it, so readers with a transparent sleep mode show it over the page you were reading. The preview shows a grey sample page underneath (it's never exported), and files are named `…-overlay`.
+- **Per-device defaults** — picking an XTEink preset defaults to BMP, Kobo defaults to PNG, each with a short install hint. A transparent choice is kept when you switch devices.
+- Exports are **rendered at 2× and downscaled** for crisper text and edges, then dithered at true panel resolution (1-bit photo looks render at native size to stay sharp). With E-ink render on, overlay edges snap to fully clear or fully inked, so there are no grey halos.
 - **Copy image to clipboard** for quick pasting, alongside Download and Open-in-new-tab
 
 ### Save & reuse
@@ -107,6 +108,11 @@ Turn on **Compare smooth vs e-ink** to split the preview side by side — the sm
 1. Open the live link in **Safari** (not the Files app preview — that won't run the tool).
 2. Build your wallpaper and export as **24-bit BMP**.
 3. Copy it to the reader and set it as your custom sleep/wallpaper image.
+
+**XTEink transparent overlay (tested on the Licorice firmware):**
+1. Build something light: a stamp, a short quote, or a sign-out card. Use the **light** theme (dark text). Photos cover the page underneath.
+2. Export as **PNG · transparent overlay** (the 32-bit BMP overlay works too).
+3. Copy it to the reader and select it with the firmware's transparent sleep screen option.
 
 **Kobo (Libra 2, etc.):**
 1. Build your wallpaper and export as **PNG**.
