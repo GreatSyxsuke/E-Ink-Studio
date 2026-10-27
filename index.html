@@ -516,6 +516,8 @@ stay hungry.</textarea>
           <select id="exportFormat">
             <option value="png">PNG</option>
             <option value="bmp24">BMP · 24-bit (e-ink wallpaper)</option>
+            <option value="pngT">PNG · transparent overlay</option>
+            <option value="bmp32">BMP · 32-bit transparent overlay</option>
           </select>
         </label>
         <p class="hint" id="exportHint" style="display:none;margin-top:-4px;"></p>
@@ -1701,11 +1703,16 @@ var QRCodeLib = (function(){
 
   // Quantize/dither the whole composited canvas to the panel's depth, so the device
   // displays it verbatim instead of adding its own grain. Also makes the preview match.
-  function quantizeCanvas(g, w, h, mode){
+  // keepAlpha: for transparent overlays, see-through pixels are treated as white (so they add no
+  // dither error) and alpha is snapped to fully on/off, since e-ink can't show half-transparent ink.
+  function quantizeCanvas(g, w, h, mode, keepAlpha){
     var img;
     try{ img=g.getImageData(0,0,w,h); }catch(e){ return; }
-    var data=img.data, n=w*h, lum=new Float32Array(n);
-    for(var p=0,px=0;p<data.length;p+=4,px++){ lum[px]=0.299*data[p]+0.587*data[p+1]+0.114*data[p+2]; }
+    var data=img.data, n=w*h, lum=new Float32Array(n), clear=keepAlpha?new Uint8Array(n):null;
+    for(var p=0,px=0;p<data.length;p+=4,px++){
+      if(keepAlpha && data[p+3]<128){ clear[px]=1; lum[px]=255; continue; }
+      lum[px]=0.299*data[p]+0.587*data[p+1]+0.114*data[p+2];
+    }
     if(mode==="grey16"){
       for(var k=0;k<n;k++){ var v=lum[k]; if(v<0)v=0; if(v>255)v=255; lum[k]=Math.round(v/255*15)/15*255; }
     } else if(mode==="bayer"){
@@ -1720,20 +1727,41 @@ var QRCodeLib = (function(){
         if(x+1<w)lum[idx+1]+=err*7/16;
         if(y+1<h){ if(x>0)lum[idx+w-1]+=err*3/16; lum[idx+w]+=err*5/16; if(x+1<w)lum[idx+w+1]+=err*1/16; } } }
     }
-    for(var p2=0,px2=0;p2<data.length;p2+=4,px2++){ var val=lum[px2]; val=val<0?0:(val>255?255:val); data[p2]=data[p2+1]=data[p2+2]=val; }
+    for(var p2=0,px2=0;p2<data.length;p2+=4,px2++){
+      var val=lum[px2]; val=val<0?0:(val>255?255:val); data[p2]=data[p2+1]=data[p2+2]=val;
+      if(keepAlpha) data[p2+3]=clear[px2]?0:255;
+    }
     g.putImageData(img,0,0);
   }
 
   // Paint a full wallpaper onto any canvas using current settings + supplied text.
+  function isTransparentFmt(f){ return f==="pngT" || f==="bmp32"; }
+
+  // Preview-only stand-in for "the page you were reading", drawn in mid grey under an overlay.
+  var SAMPLE_PAGE="It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife. However little known the feelings or views of such a man may be on his first entering a neighbourhood, this truth is so well fixed in the minds of the surrounding families, that he is considered the rightful property of some one or other of their daughters.\n“My dear Mr. Bennet,” said his lady to him one day, “have you heard that Netherfield Park is let at last?” Mr. Bennet replied that he had not. “But it is,” returned she; “for Mrs. Long has just been here, and she told me all about it.” Mr. Bennet made no answer. “Do you not want to know who has taken it?” cried his wife impatiently. “You want to tell me, and I have no objection to hearing it.” This was invitation enough.";
+  function drawSamplePage(g,w,h){
+    var mind=Math.min(w,h), m=mind*0.07, px=Math.max(10,Math.round(mind*0.036));
+    g.fillStyle="#ffffff"; g.fillRect(0,0,w,h);
+    g.fillStyle="#8a8a8a"; g.textAlign="left"; g.textBaseline="alphabetic";
+    g.font="400 "+px+"px Georgia,'Times New Roman',serif";
+    var lines=wrapLines(g,SAMPLE_PAGE+"\n"+SAMPLE_PAGE,w-2*m), y=m+px, lh=px*1.45;
+    for(var i=0;i<lines.length && y<h-m-px;i++){ g.fillText(lines[i],m,y); y+=lh; }
+    g.font="400 "+Math.round(px*0.7)+"px Georgia,serif"; g.textAlign="center";
+    g.fillText("Chapter 1  ·  12%",w/2,h-m*0.5);
+    g.textAlign="left";
+  }
+
   function paint(cv, mainInput, footInput, opts){
     var g = cv.getContext("2d");
     var scale = (opts && opts.scale) ? opts.scale : 1;
     var d = currentDims(), w=d.w*scale, h=d.h*scale;
     cv.width=w; cv.height=h;
     var theme = THEMES[state.theme];
+    var transp = !!(opts && opts.transparent);
 
-    g.fillStyle=theme.bg;
-    g.fillRect(0,0,w,h);
+    // Transparent overlays leave the paper out. The preview fakes a book page underneath.
+    if(transp){ if(opts.samplePage) drawSamplePage(g,w,h); }
+    else { g.fillStyle=theme.bg; g.fillRect(0,0,w,h); }
 
     // ----- PHOTO -----
     if(userImage){
@@ -1745,7 +1773,7 @@ var QRCodeLib = (function(){
     }
 
     // ----- PAPER GRAIN -----
-    if(state.paperGrain>0){
+    if(state.paperGrain>0 && !transp){
       var gp=getGrainPattern(g);
       if(gp){ g.save(); g.globalAlpha=state.paperGrain/100*0.20; g.fillStyle=gp; g.fillRect(0,0,w,h); g.globalAlpha=1; g.restore(); }
     }
@@ -1871,7 +1899,7 @@ var QRCodeLib = (function(){
     }
 
     // E-ink render: quantize the whole image so preview matches the panel and the device won't re-dither.
-    if(!(opts&&opts.skipEink) && state.einkOut && state.einkOut!=="off") quantizeCanvas(g,w,h,state.einkOut);
+    if(!(opts&&opts.skipEink) && state.einkOut && state.einkOut!=="off") quantizeCanvas(g,w,h,state.einkOut,transp && !opts.samplePage);
 
     // Safe-zone guide is a preview aid only — never baked into an export.
     if(opts && opts.guide) drawSafeZone(g,w,h);
@@ -1888,16 +1916,16 @@ var QRCodeLib = (function(){
     $("#capA").style.display = on?"block":"none";
   }
   function render(){
-    var res;
+    var res, tp=isTransparentFmt(state.exportFormat);
     if(state.compare){
       // Left pane: the smooth composite (no e-ink pass). Right pane: what the panel will show.
-      paint(canvas, $("#mainText").value, $("#footText").value, {guide:state.safeZone, skipEink:true});
-      res = paint(canvasB, $("#mainText").value, $("#footText").value, {guide:false});
+      paint(canvas, $("#mainText").value, $("#footText").value, {guide:state.safeZone, skipEink:true, transparent:tp, samplePage:tp});
+      res = paint(canvasB, $("#mainText").value, $("#footText").value, {guide:false, transparent:tp, samplePage:tp});
       $("#capB").textContent = (state.einkOut && state.einkOut!=="off")
         ? "On device · "+(EINK_LABELS[state.einkOut]||state.einkOut)
         : "On device — pick a render mode";
     } else {
-      res = paint(canvas, $("#mainText").value, $("#footText").value, {guide:state.safeZone});
+      res = paint(canvas, $("#mainText").value, $("#footText").value, {guide:state.safeZone, transparent:tp, samplePage:tp});
     }
     $("#dimsLabel").textContent = "Canvas "+res.w+" × "+res.h+" px · "+(res.w/res.h).toFixed(2)+" aspect";
     var qrState=$("#qrState");
@@ -1971,12 +1999,15 @@ var QRCodeLib = (function(){
     return {fmt:null, hint:""};
   }
   function updateExportHint(){
-    var p=deviceProfile(), el=$("#exportHint");
-    el.textContent=p.hint; el.style.display=p.hint?"block":"none";
+    var p=deviceProfile(), el=$("#exportHint"), hint=p.hint;
+    if(isTransparentFmt(state.exportFormat))
+      hint="Transparent overlay: only your text and artwork are saved, so the page you were reading shows through. Your reader needs a transparent or overlay sleep mode. The preview shows a sample page underneath.";
+    el.textContent=hint; el.style.display=hint?"block":"none";
   }
   function applyDeviceDefault(){
     var p=deviceProfile();
-    if(p.fmt){ state.exportFormat=p.fmt; $("#exportFormat").value=p.fmt; }
+    // Keep a transparent choice when switching devices; otherwise pick the device's usual format.
+    if(p.fmt && !isTransparentFmt(state.exportFormat)){ state.exportFormat=p.fmt; $("#exportFormat").value=p.fmt; }
     updateExportHint();
   }
 
@@ -2034,7 +2065,28 @@ var QRCodeLib = (function(){
   $("#imgFadeRange").addEventListener("input",function(e){ state.imgFade=+e.target.value; $("#imgFadeVal").textContent=e.target.value+"%"; render(); });
 
   function filename(){ var d=currentDims(); return "eink-wallpaper-"+d.w+"x"+d.h+".png"; }
-  function filenameFor(fmt){ var d=currentDims(); return "eink-wallpaper-"+d.w+"x"+d.h+"."+(fmt==="png"?"png":"bmp"); }
+  function filenameFor(fmt){
+    var d=currentDims(), png=(fmt==="png"||fmt==="pngT");
+    return "eink-wallpaper-"+d.w+"x"+d.h+(isTransparentFmt(fmt)?"-overlay":"")+"."+(png?"png":"bmp");
+  }
+
+  // Encode a canvas as an uncompressed 32-bit BGRA BMP, keeping per-pixel transparency.
+  function canvasToBMP32(cv){
+    var w=cv.width, h=cv.height;
+    var data=cv.getContext("2d").getImageData(0,0,w,h).data;
+    var rowSize=w*4, pix=rowSize*h, size=54+pix;
+    var buf=new ArrayBuffer(size), dv=new DataView(buf), b=new Uint8Array(buf);
+    b[0]=0x42; b[1]=0x4D;
+    dv.setUint32(2,size,true); dv.setUint32(10,54,true);
+    dv.setUint32(14,40,true); dv.setInt32(18,w,true); dv.setInt32(22,h,true);
+    dv.setUint16(26,1,true); dv.setUint16(28,32,true); dv.setUint32(30,0,true);
+    dv.setUint32(34,pix,true); dv.setInt32(38,2835,true); dv.setInt32(42,2835,true);
+    for(var fr=0;fr<h;fr++){
+      var iy=h-1-fr, p=54+fr*rowSize, src=iy*w*4;
+      for(var x=0;x<w;x++){ var i=src+x*4; b[p]=data[i+2]; b[p+1]=data[i+1]; b[p+2]=data[i]; b[p+3]=data[i+3]; p+=4; }
+    }
+    return new Blob([buf],{type:"image/bmp"});
+  }
 
   // Encode a canvas as an uncompressed 24-bit Windows BMP (max device compatibility).
   function canvasToBMP24(cv){
@@ -2055,11 +2107,11 @@ var QRCodeLib = (function(){
   }
 
   function downloadCanvasAs(cv, fmt, name){
-    var ext = fmt==="png" ? "png" : "bmp";
+    var png = (fmt==="png" || fmt==="pngT"), ext = png ? "png" : "bmp";
     var fname = name ? (name.indexOf(".")<0 ? name+"."+ext : name) : filenameFor(fmt);
-    if(fmt==="png"){ downloadCanvas(cv, fname); return; }
+    if(png){ downloadCanvas(cv, fname); return; }
     var blob;
-    try{ blob = canvasToBMP24(cv); }
+    try{ blob = fmt==="bmp32" ? canvasToBMP32(cv) : canvasToBMP24(cv); }
     catch(err){ alert("Could not build the BMP. Try PNG, or a smaller preset."); return; }
     var url=URL.createObjectURL(blob);
     var a=document.createElement("a"); a.href=url; a.download=fname; a.rel="noopener";
@@ -2077,7 +2129,7 @@ var QRCodeLib = (function(){
     setTimeout(function(){ a.remove(); }, 120);
   }
 
-  $("#exportFormat").addEventListener("change",function(e){ state.exportFormat=e.target.value; });
+  $("#exportFormat").addEventListener("change",function(e){ state.exportFormat=e.target.value; updateExportHint(); render(); });
   $("#einkOut").addEventListener("change",function(e){ state.einkOut=e.target.value; render(); });
   $("#compareChk").addEventListener("change",function(e){ state.compare=e.target.checked; setCompareUI(); render(); });
 
@@ -2092,12 +2144,12 @@ var QRCodeLib = (function(){
   function renderExportCanvas(){
     var d=currentDims(), nw=d.w, nh=d.h, SS=exportScale();
     var tmp=document.createElement("canvas");
-    paint(tmp, $("#mainText").value, $("#footText").value, {guide:false, scale:SS, skipEink:true});
+    paint(tmp, $("#mainText").value, $("#footText").value, {guide:false, scale:SS, skipEink:true, transparent:isTransparentFmt(state.exportFormat)});
     var out=document.createElement("canvas"); out.width=nw; out.height=nh;
     var o=out.getContext("2d");
     o.imageSmoothingEnabled=true; o.imageSmoothingQuality="high";
     o.drawImage(tmp, 0,0,tmp.width,tmp.height, 0,0,nw,nh);
-    if(state.einkOut && state.einkOut!=="off") quantizeCanvas(o, nw, nh, state.einkOut);
+    if(state.einkOut && state.einkOut!=="off") quantizeCanvas(o, nw, nh, state.einkOut, isTransparentFmt(state.exportFormat));
     return out;
   }
 
@@ -2138,8 +2190,9 @@ var QRCodeLib = (function(){
   });
 
   // ---------- Version, changelog & share image ----------
-  var VERSION="1.9";
+  var VERSION="1.10";
   var CHANGELOG=[
+    ["1.10","Transparent overlay export (PNG or 32-bit BMP) for readers that draw the sleep image over your last page, with a sample-page preview."],
     ["1.9","Ink stamp: a standalone Stamp layout and a stamp overlay for any layout, box or round, with seeded ink wear. Fixed the Kobo install hint."],
     ["1.8","Sign-out card layout: a library-style card (or any sign-out sheet) with stamped dates, written names, and custom columns."],
     ["1.7","Week-at-a-glance layout, a goofy example library (Insert example), and per-device export defaults with install hints."],
