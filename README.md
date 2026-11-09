@@ -20,8 +20,7 @@ Toggle **portrait / landscape** on any preset.
 
 ### Text wallpapers
 - Eight layout templates: **Quote**, **Date**, **Agenda**, **Habits**, **Reading**, **Week**, **Sign-out**, **Stamp**
-- **Insert example** (🎲) drops in a random starter matched to the current template — quotes, goofy to-do lists, joke habit grids, a book with progress, a week of plans, a silly sign-out card, or a librarian stamp
-- **Surprise me** shuffles the whole look (font, theme, size, position)
+- **Surprise me** (🎲) — **tap** for new words that fit the current layout (quotes, goofy to-do lists, joke habit grids, a book with progress, a week of plans, a silly sign-out card, or a librarian stamp). **Hold** for new words *and* a whole new look (font, weight, theme, position, size).
 - Built-in fonts plus **custom font upload** (any `.ttf`/`.otf`/`.woff`)
 - Control style, size, alignment, vertical position, and margin
 
@@ -30,12 +29,12 @@ Resolved live from the device clock when you generate the image:
 
 | Token | Example |
 |---|---|
-| `{date}` | October 25, 2026 |
-| `{shortdate}` | 10/25/2026 |
-| `{weekday}` | Sunday |
-| `{day}` `{month}` `{monthnum}` `{year}` | 25 · October · 10 · 2026 |
-| `{time}` `{time24}` | 10:48 PM · 22:48 |
-| `{weeknum}` `{dayofyear}` | 43 · 298 |
+| `{date}` | November 9, 2026 |
+| `{shortdate}` | 11/9/2026 |
+| `{weekday}` | Monday |
+| `{day}` `{month}` `{monthnum}` `{year}` | 9 · November · 11 · 2026 |
+| `{time}` `{time24}` | 6:32 PM · 18:32 |
+| `{weeknum}` `{dayofyear}` | 46 · 313 |
 | `{moonphase}` | e.g. Waxing Gibbous |
 
 #### Layout syntax
@@ -72,13 +71,10 @@ Use it as the standalone **Stamp** layout, or switch on **Stamp over the current
 - Accent rule and hairline border
 - **Extras:** auto text color, lock-screen safe-zone guide, paper grain
 
-### QR codes
-Drop in a URL and place a self-contained QR code in any corner. It always sits on a white patch so it scans on either theme.
-
 ### Photos
 Load a JPG/PNG/WebP and it's converted to grayscale and sized to the preset.
 
-- **Look:** Greyscale, 16-level, Floyd, Atkinson, Bayer, Halftone, Two-tone
+- **Look:** Greyscale, 16-level, Floyd, Atkinson, Bayer, Two-tone
 - **Fade** to keep overlaid text legible
 - **Position & crop:** zoom and pan
 - **Adjust tone:** brightness, contrast, sharpen
@@ -98,6 +94,8 @@ Turn on **Compare smooth vs e-ink** to split the preview side by side — the sm
 - **Copy image to clipboard** for quick pasting, alongside Download and Open-in-new-tab
 
 ### Save & reuse
+- **Remembers your last session** — reopen the tool and your text, layout, device, stamp, and export settings are as you left them. Photos and uploaded fonts aren't remembered (they're too large to store). Each browser remembers separately. Use **start fresh** in the footer to clear it.
+- **Foldable cards** — tap any card heading to collapse it. Photo, Ink stamp, and Saved looks start folded, and the tool remembers your choices. The Export card always stays open.
 - **Saved looks** persist in your browser, plus a copyable settings code to move a look between devices
 - **Save this app** exports a standalone copy of the tool itself
 - Add to Home Screen on iOS/Android for an app-like launch
