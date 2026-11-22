@@ -86,7 +86,7 @@ Turn pages from a PDF into wallpapers: comic and manga pages, book covers, art b
 
 - **Import pages from a PDF** (in the Photo card) opens a page picker with thumbnails. Tap pages, or type a range like `1-5, 12, 20-`.
 - Step through your picked pages with **‹ ›**. The current page becomes the photo, so every Look, tone, fit and export setting applies.
-- **Trim white margins** crops the blank border. Raise **Ignore specks** if a scanned page won't trim because of dust or a page number.
+- **Trim page margins** crops the blank border, including cream or grey paper on scanned pages and dark scanner edges or spine shadows. Raise **Ignore specks** if dust or a page number keeps it from trimming tight.
 - **Download all pages** saves every picked page with the current look. On iPhone, save pages one at a time instead.
 - Pages render at your device's full resolution and re-render if you switch to a larger preset.
 
