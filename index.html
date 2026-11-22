@@ -257,7 +257,7 @@ stay hungry.</textarea>
             <button class="btn-ghost" id="pdfNext" aria-label="Next page">›</button>
           </div>
           <label class="check" style="margin:12px 0 8px;">
-            <input type="checkbox" id="pdfTrimChk"> Trim white margins
+            <input type="checkbox" id="pdfTrimChk"> Trim page margins
           </label>
           <label class="field" id="pdfTrimField" style="display:none;">
             <span class="field-label">Ignore specks (for scanned pages)</span>
@@ -560,7 +560,7 @@ stay hungry.</textarea>
         <button class="btn-ghost" id="openBtn">Open image in new tab</button>
         <p class="hint" style="text-align:center;">Many e-ink devices (XTEink included) only accept <strong>24-bit BMP</strong> as a wallpaper, even if they display PNG. If a download doesn't start, use “Open in new tab,” then long-press / right-click to save.</p>
         <button class="btn-ghost" id="saveAppBtn" style="margin-top:14px;">📱 Save this app for your phone</button>
-        <p class="hint" style="text-align:center;">Downloads the whole tool as one file. AirDrop it to your iPhone and open in Safari, or upload it to GitHub Pages, then Add to Home Screen.</p>
+        <p class="hint" style="text-align:center;">Downloads the whole tool as one file for a Mac or PC. On iPhone, open the live site in Safari and use Share → Add to Home Screen instead — the Files app can't run the saved file.</p>
       </div>
     </div>
 
@@ -1906,26 +1906,49 @@ stay hungry.</textarea>
     });
   }
 
-  // Crop white margins. A row or column only counts as content once it holds more ink than the
-  // speck allowance, so scanner dust and a lone page number don't stop the trim.
+  // Crop the blank margin around a page. "Blank" is measured against this page's own paper colour,
+  // so cream or grey scans trim too. Rows and columns need more ink than the speck allowance to
+  // count as content, and near-solid dark bands at the edges (scanner borders, spine shadow) are
+  // treated as margin rather than content.
   function trimMargins(src,sens){
-    var w=src.width, h=src.height, d;
-    try{ d=src.getContext("2d").getImageData(0,0,w,h).data; }catch(e){ return src; }
-    var rows=new Uint32Array(h), cols=new Uint32Array(w), i=0;
-    for(var y=0;y<h;y++){ for(var x=0;x<w;x++,i+=4){
-      if(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]<200){ rows[y]++; cols[x]++; }
-    } }
-    var rowMin=Math.max(1,Math.round(w*sens/100*0.02)), colMin=Math.max(1,Math.round(h*sens/100*0.02));
-    var top=0, bot=h-1, left=0, right=w-1;
-    while(top<h && rows[top]<rowMin) top++;
-    while(bot>top && rows[bot]<rowMin) bot--;
-    while(left<w && cols[left]<colMin) left++;
-    while(right>left && cols[right]<colMin) right--;
-    if(top>=bot || left>=right) return src;
+    var W=src.width, H=src.height, d;
+    try{ d=src.getContext("2d").getImageData(0,0,W,H).data; }catch(e){ return src; }
+    // Analyse a smaller sampled grid for speed, then map the crop back to full size.
+    var st=Math.max(1,Math.ceil(Math.max(W,H)/1200)), w=Math.floor(W/st), h=Math.floor(H/st);
+    var lum=new Uint8Array(w*h), x, y, k;
+    for(y=0;y<h;y++){ for(x=0;x<w;x++){ var i=((y*st)*W+x*st)*4; lum[y*w+x]=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; } }
+    // Paper colour: a bright percentile of the page's middle, where text is the minority.
+    var hist=new Uint32Array(256), n=0;
+    for(y=Math.floor(h*0.2);y<h*0.8;y++){ for(x=Math.floor(w*0.2);x<w*0.8;x++){ hist[lum[y*w+x]]++; n++; } }
+    var paper=255, acc=0;
+    for(k=0;k<256;k++){ acc+=hist[k]; if(acc>=n*0.7){ paper=k; break; } }
+    var thr=paper-Math.max(30,paper*0.25), ink=new Uint8Array(w*h);
+    for(k=0;k<ink.length;k++) ink[k]=lum[k]<thr?1:0;
+
+    var top=0, bot=h-1, left=0, right=w-1, EDGE=0.15, DENSE=0.55;
+    function rowsPass(){
+      var span=right-left+1, min=Math.max(1,Math.round(span*sens/100*0.02)), lim=Math.floor(h*EDGE);
+      function margin(r,nearEdge){ var c=0; for(var cx=left;cx<=right;cx++) c+=ink[r*w+cx]; return c<min || (nearEdge && c>span*DENSE); }
+      var t=0; while(t<h-1 && margin(t,t<lim)) t++;
+      var b=h-1; while(b>t && margin(b,b>h-1-lim)) b--;
+      top=t; bot=b;
+    }
+    function colsPass(){
+      var span=bot-top+1, min=Math.max(1,Math.round(span*sens/100*0.02)), lim=Math.floor(w*EDGE);
+      function margin(c,nearEdge){ var s=0; for(var cy=top;cy<=bot;cy++) s+=ink[cy*w+c]; return s<min || (nearEdge && s>span*DENSE); }
+      var l=0; while(l<w-1 && margin(l,l<lim)) l++;
+      var r=w-1; while(r>l && margin(r,r>w-1-lim)) r--;
+      left=l; right=r;
+    }
+    // Two rounds: a dark band on one axis pollutes the counts on the other until it's cropped away.
+    rowsPass(); colsPass(); rowsPass(); colsPass();
+    // Safety net: if almost nothing would survive, keep the page as it was.
+    if(bot-top<h*0.2 || right-left<w*0.2) return src;
     var pad=Math.round(Math.min(w,h)*0.015);
-    top=Math.max(0,top-pad); left=Math.max(0,left-pad); bot=Math.min(h-1,bot+pad); right=Math.min(w-1,right+pad);
-    var out=document.createElement("canvas"); out.width=right-left+1; out.height=bot-top+1;
-    out.getContext("2d").drawImage(src,left,top,out.width,out.height,0,0,out.width,out.height);
+    var sx=Math.max(0,(left-pad)*st), sy=Math.max(0,(top-pad)*st);
+    var ex=Math.min(W,(right+1+pad)*st), ey=Math.min(H,(bot+1+pad)*st);
+    var out=document.createElement("canvas"); out.width=ex-sx; out.height=ey-sy;
+    out.getContext("2d").drawImage(src,sx,sy,out.width,out.height,0,0,out.width,out.height);
     return out;
   }
 
@@ -2130,8 +2153,9 @@ stay hungry.</textarea>
   });
 
   // ---------- Version, changelog & share image ----------
-  var VERSION="1.12";
+  var VERSION="1.13";
   var CHANGELOG=[
+    ["1.13","Margin trim now works on scanned pages: it reads each page's own paper colour and skips scanner borders and spine shadows. Clearer iPhone instructions for Save this app."],
     ["1.12","Import pages from a PDF: pick pages from thumbnails or a range, step through them, trim white margins, and download them all. The PDF reader only downloads when you use it. Fixed Save this app."],
     ["1.11","Remembers your last session, foldable cards, and one Surprise me button (tap for words, hold for a new look). Removed the QR code and Halftone."],
     ["1.10","Transparent overlay export (PNG or 32-bit BMP) for readers that draw the sleep image over your last page, with a sample-page preview."],
@@ -2246,7 +2270,7 @@ stay hungry.</textarea>
         '<title>Save E Ink Wallpaper Studio</title>'+
         '<body style="font-family:-apple-system,system-ui,Helvetica,sans-serif;max-width:640px;margin:0 auto;padding:32px 22px 60px;color:#111;line-height:1.5">'+
         '<h2 style="font-family:Georgia,serif;margin:0 0 6px">Save the app</h2>'+
-        '<p style="color:#555;margin:0 0 18px">Click to download <code>eink-wallpaper-studio.html</code>. To use it on an iPhone, upload it to GitHub Pages (rename it <code>index.html</code>) and open that link in Safari — tapping the file in the iOS Files app only previews it and won\'t run the tool.</p>'+
+        '<p style="color:#555;margin:0 0 18px">Click to download <code>eink-wallpaper-studio.html</code> and open it in any browser on a Mac or PC. On an iPhone, skip the file: open the live site in Safari and tap Share → Add to Home Screen. Tapping the file in the iOS Files app only previews it and won\'t run the tool.</p>'+
         (b64 ? '<p><a id="dl" download="eink-wallpaper-studio.html" href="data:text/html;charset=utf-8;base64,'+b64+'" '+
           'style="display:inline-block;background:#c2410c;color:#fff;padding:13px 22px;border-radius:9px;text-decoration:none;font-weight:700">Download the app file</a></p>'+
           '<p style="color:#888;font-size:13px">If the button doesn\'t save, right-click it and choose “Save Link As,” or copy everything below into a file named <code>index.html</code>.</p>' : '')+
