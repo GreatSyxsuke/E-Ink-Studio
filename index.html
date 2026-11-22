@@ -183,6 +183,29 @@
   body.compare canvas#preview,body.compare canvas#previewB{max-height:54vh;}
   .palette-note{font-size:11px;color:var(--muted);text-align:center;margin-top:14px;letter-spacing:.02em;}
   .footer{margin-top:26px;font-size:12px;color:var(--muted);text-align:center;line-height:1.6;}
+  /* PDF page picker: a full-screen overlay that only exists while you choose pages. */
+  .pdf-pick{position:fixed;inset:0;z-index:50;background:rgba(20,15,5,.55);display:flex;align-items:center;justify-content:center;padding:18px;}
+  .pdf-pick[hidden]{display:none;}
+  .pp-box{background:var(--paper);border-radius:14px;box-shadow:var(--shadow);width:min(920px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden;}
+  .pp-head{padding:14px 16px 10px;border-bottom:1px solid var(--line);}
+  .pp-title{font-family:"Didot","Bodoni 72",Baskerville,Georgia,serif;font-size:20px;font-weight:700;margin:0 0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .pp-tools{display:grid;grid-template-columns:1fr auto auto auto;gap:6px;align-items:center;}
+  .pp-tools .btn-ghost{margin:0;width:auto;padding:9px 12px;white-space:nowrap;}
+  .pp-grid{flex:1;overflow-y:auto;padding:14px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;align-content:start;}
+  .pp-page{border:2px solid transparent;border-radius:8px;background:none;padding:4px;cursor:pointer;font-family:inherit;color:#2a271f;}
+  .pp-page.on{border-color:var(--accent);background:rgba(194,65,12,.08);}
+  .pp-thumb{background:#fff;border:1px solid var(--line);aspect-ratio:3/4;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  .pp-thumb canvas{max-width:100%;max-height:100%;display:block;}
+  .pp-num{display:block;font-size:11px;font-weight:600;margin-top:4px;text-align:center;}
+  .pp-page.on .pp-num{color:var(--accent);}
+  .pp-foot{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;}
+  .pp-foot .hint{flex:1;margin:0;}
+  .pp-foot .btn-ghost,.pp-foot .btn-primary{margin:0;width:auto;padding:11px 16px;}
+  .pdf-step{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;}
+  .pdf-step .btn-ghost{margin:0;width:auto;padding:8px 14px;}
+  .pdf-step .btn-ghost:disabled,#pdfAllBtn:disabled{opacity:.4;cursor:default;}
+  .pdf-step span{text-align:center;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;}
+  @media (max-width:560px){ .pp-tools{grid-template-columns:1fr 1fr 1fr;} .pp-tools input{grid-column:1/-1;} .pdf-pick{padding:0;} .pp-box{border-radius:0;height:100%;} }
 </style>
 </head>
 <body>
@@ -223,6 +246,26 @@ stay hungry.</textarea>
             <input type="file" id="imgFile" accept="image/*">
           </label>
         </label>
+        <label class="filebtn" style="margin-top:8px;">
+          <span id="pdfFileLabel">＋ Import pages from a PDF</span>
+          <input type="file" id="pdfFile" accept="application/pdf,.pdf">
+        </label>
+        <div id="pdfControls" style="display:none;margin-top:12px;">
+          <div class="pdf-step">
+            <button class="btn-ghost" id="pdfPrev" aria-label="Previous page">‹</button>
+            <span id="pdfStepLabel"></span>
+            <button class="btn-ghost" id="pdfNext" aria-label="Next page">›</button>
+          </div>
+          <label class="check" style="margin:12px 0 8px;">
+            <input type="checkbox" id="pdfTrimChk"> Trim white margins
+          </label>
+          <label class="field" id="pdfTrimField" style="display:none;">
+            <span class="field-label">Ignore specks (for scanned pages)</span>
+            <div class="range-row"><input type="range" id="pdfTrimRange" min="0" max="100" value="30"><span class="range-val" id="pdfTrimVal">30</span></div>
+          </label>
+          <button class="btn-ghost" id="pdfChooseBtn" style="margin-top:0;">Choose pages…</button>
+          <button class="btn-ghost" id="pdfAllBtn" style="display:none;">Download all pages</button>
+        </div>
         <div id="imgControls" style="display:none;margin-top:12px;">
           <label class="field">
             <span class="field-label">Fit to preset</span>
@@ -551,6 +594,26 @@ stay hungry.</textarea>
   <div id="changelogBox" style="display:none;max-width:460px;margin:8px auto 0;font-size:11px;color:var(--muted);text-align:left;line-height:1.65;"></div>
 </div>
 
+<div class="pdf-pick" id="pdfPick" hidden="">
+  <div class="pp-box" role="dialog" aria-modal="true" aria-labelledby="ppTitle">
+    <div class="pp-head">
+      <p class="pp-title" id="ppTitle">PDF pages</p>
+      <div class="pp-tools">
+        <input type="text" id="ppRange" placeholder="Pages, e.g. 1-5, 12, 20-">
+        <button class="btn-ghost" id="ppRangeBtn">Select range</button>
+        <button class="btn-ghost" id="ppAllBtn">All</button>
+        <button class="btn-ghost" id="ppNoneBtn">Clear</button>
+      </div>
+    </div>
+    <div class="pp-grid" id="ppGrid"></div>
+    <div class="pp-foot">
+      <p class="hint" id="ppCount">Tap pages to pick them.</p>
+      <button class="btn-ghost" id="ppCancel">Cancel</button>
+      <button class="btn-primary" id="ppUse" disabled="">Use pages</button>
+    </div>
+  </div>
+</div>
+
 <!-- ================= APP ================= -->
 <script>
 (function(){
@@ -599,6 +662,7 @@ stay hungry.</textarea>
     imgZoom:100, imgPanX:0, imgPanY:0,
     imgThreshold:50, imgVignette:0, imgRound:0,
     paperGrain:0,
+    pdfTrim:false, pdfTrimSens:30,
     autoText:false, safeZone:false,
     stampOn:false, stampText:"OVERDUE", stampDate:"{shortdate}", stampShape:"rect", stampPos:"center", stampWear:45, stampSeed:0,
     exportFormat:"png", einkOut:"off",
@@ -1529,6 +1593,7 @@ stay hungry.</textarea>
     }
     $("#dimsLabel").textContent = "Canvas "+res.w+" × "+res.h+" px · "+(res.w/res.h).toFixed(2)+" aspect";
     queueSessionSave();
+    pdfCheckRes();
   }
 
   function wireSeg(sel, key, attr){
@@ -1625,6 +1690,7 @@ stay hungry.</textarea>
     reader.onload=function(ev){
       var im=new Image();
       im.onload=function(){
+        closePdf();
         userImage=im; imgToken++; imgCache={canvas:null,key:""};
         $("#imgControls").style.display="block";
         var short=file.name.length>22?file.name.slice(0,21)+"…":file.name;
@@ -1638,12 +1704,292 @@ stay hungry.</textarea>
     reader.readAsDataURL(file);
   });
   $("#imgRemoveBtn").addEventListener("click",function(){
+    closePdf();
     userImage=null; imgCache={canvas:null,key:""};
     $("#imgControls").style.display="none";
     $("#imgFileLabel").textContent="＋ Add an image (jpg · png · webp)";
     $("#imgState").textContent="";
     $("#imgFile").value="";
     render();
+  });
+
+  // ---------- PDF pages ----------
+  // The PDF reader (pdf.js) is only downloaded the first time someone imports a PDF, so the
+  // rest of the tool stays small and offline. A chosen page is rendered to a canvas and becomes
+  // the photo, so every Photo, Finish and Export setting applies to it unchanged.
+  var PDFJS_BASE="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/", pdfLibP=null;
+  var pdfDoc=null, pdfName="", pdfPages=[], pdfIdx=0, pdfRaw={}, pdfActive=false;
+  var pdfRenderSeq=0, pdfDocToken=0, pdfResTimer=null, pdfTrimTimer=null;
+  var ppSel=[], ppObserver=null, thumbQueue=Promise.resolve();
+
+  function loadPdfLib(){
+    if(window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    if(pdfLibP) return pdfLibP;
+    pdfLibP=new Promise(function(resolve,reject){
+      var s=document.createElement("script"); s.src=PDFJS_BASE+"pdf.min.js"; s.async=true;
+      s.onload=function(){
+        var lib=window.pdfjsLib;
+        if(!lib){ pdfLibP=null; reject({offline:true}); return; }
+        lib.GlobalWorkerOptions.workerSrc=PDFJS_BASE+"pdf.worker.min.js";
+        resolve(lib);
+      };
+      s.onerror=function(){ s.remove(); pdfLibP=null; reject({offline:true}); };
+      document.head.appendChild(s);
+    });
+    return pdfLibP;
+  }
+  function shortName(n){ return n.length>22 ? n.slice(0,21)+"…" : n; }
+  function pdfSlug(){ return (pdfName.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,30))||"pdf"; }
+
+  $("#pdfFile").addEventListener("change",function(e){
+    var file=e.target.files && e.target.files[0];
+    e.target.value=""; // lets the same file be picked again
+    if(!file) return;
+    var label=$("#pdfFileLabel"), before=label.textContent;
+    label.textContent="Loading the PDF reader…";
+    loadPdfLib().then(function(lib){
+      label.textContent="Opening "+shortName(file.name)+"…";
+      return file.arrayBuffer().then(function(buf){
+        // isEvalSupported:false closes a known font-handling hole in older pdf.js builds.
+        return lib.getDocument({data:new Uint8Array(buf), isEvalSupported:false}).promise;
+      });
+    }).then(function(doc){
+      closePdf();
+      pdfDoc=doc; pdfDocToken++;
+      pdfName=file.name.replace(/\.pdf$/i,"");
+      label.textContent="✓ "+shortName(file.name)+" · "+doc.numPages+" page"+(doc.numPages===1?"":"s");
+      updatePdfUI();
+      openPicker();
+    }).catch(function(err){
+      label.textContent=before;
+      alert(err && err.offline
+        ? "PDF import needs an internet connection the first time, to download the PDF reader. Everything else works offline."
+        : "Couldn't open that PDF. It may be damaged or password-protected.");
+    });
+  });
+
+  function closePdf(){
+    pdfRenderSeq++; pdfDocToken++;
+    if(pdfDoc){ try{ pdfDoc.destroy(); }catch(e){} }
+    pdfDoc=null; pdfPages=[]; pdfIdx=0; pdfRaw={}; pdfActive=false;
+    $("#pdfFileLabel").textContent="＋ Import pages from a PDF";
+    updatePdfUI();
+  }
+
+  function updatePdfUI(){
+    $("#pdfControls").style.display=pdfDoc?"block":"none";
+    var k=pdfPages.length, many=k>1;
+    $("#pdfStepLabel").textContent = k ? "Page "+pdfPages[pdfIdx]+(many?" · "+(pdfIdx+1)+" of "+k:"") : "No pages picked yet";
+    $("#pdfPrev").disabled=pdfIdx<=0; $("#pdfNext").disabled=pdfIdx>=k-1;
+    $("#pdfPrev").style.visibility=$("#pdfNext").style.visibility=many?"visible":"hidden";
+    var all=$("#pdfAllBtn");
+    all.style.display=many?"":"none";
+    if(!all.disabled) all.textContent="Download all "+k+" pages";
+  }
+
+  // Page range like "1-5, 12, 20-" → sorted unique page numbers within 1..max.
+  function parseRange(str,max){
+    var out=[];
+    (str||"").split(",").forEach(function(part){
+      part=part.trim(); if(!part) return;
+      var m=part.match(/^(\d*)\s*-\s*(\d*)$/), a, b;
+      if(m && (m[1]||m[2])){ a=m[1]?+m[1]:1; b=m[2]?+m[2]:max; }
+      else if(/^\d+$/.test(part)){ a=b=+part; }
+      else return;
+      if(a>b){ var t=a; a=b; b=t; }
+      for(var i=Math.max(1,a);i<=Math.min(max,b);i++) if(out.indexOf(i)<0) out.push(i);
+    });
+    return out.sort(function(x,y){ return x-y; });
+  }
+
+  // ----- Picker overlay: thumbnails render only as they scroll into view -----
+  function openPicker(){
+    if(!pdfDoc) return;
+    var grid=$("#ppGrid"), n=pdfDoc.numPages;
+    $("#ppTitle").textContent=pdfName+" · "+n+" page"+(n===1?"":"s");
+    $("#ppRange").value="";
+    ppSel=pdfPages.slice();
+    grid.innerHTML="";
+    if(ppObserver) ppObserver.disconnect();
+    ppObserver=("IntersectionObserver" in window) ? new IntersectionObserver(function(entries){
+      entries.forEach(function(en){ if(en.isIntersecting){ ppObserver.unobserve(en.target); queueThumb(en.target); } });
+    },{root:grid, rootMargin:"400px 0px"}) : null;
+    for(var p=1;p<=n;p++){
+      var b=document.createElement("button");
+      b.type="button"; b.className="pp-page"; b.setAttribute("data-page",p);
+      b.innerHTML='<span class="pp-thumb"></span><span class="pp-num">'+p+'</span>';
+      grid.appendChild(b);
+      if(ppObserver) ppObserver.observe(b); else queueThumb(b);
+    }
+    syncPicker();
+    $("#pdfPick").hidden=false;
+    document.body.style.overflow="hidden";
+    grid.scrollTop=0;
+  }
+  function closePicker(){
+    $("#pdfPick").hidden=true;
+    document.body.style.overflow="";
+    if(ppObserver){ ppObserver.disconnect(); ppObserver=null; }
+  }
+  function queueThumb(btn){
+    var token=pdfDocToken;
+    thumbQueue=thumbQueue.then(function(){
+      if(token!==pdfDocToken || !pdfDoc || $("#pdfPick").hidden) return;
+      var n=+btn.getAttribute("data-page");
+      return pdfDoc.getPage(n).then(function(page){
+        var vp1=page.getViewport({scale:1}), s=Math.min(220/vp1.width,290/vp1.height), vp=page.getViewport({scale:s});
+        var c=document.createElement("canvas"); c.width=Math.ceil(vp.width); c.height=Math.ceil(vp.height);
+        var g=c.getContext("2d"); g.fillStyle="#fff"; g.fillRect(0,0,c.width,c.height);
+        return page.render({canvasContext:g, viewport:vp}).promise.then(function(){
+          page.cleanup();
+          if(token===pdfDocToken) btn.querySelector(".pp-thumb").appendChild(c);
+        });
+      });
+    }).catch(function(){});
+  }
+  function syncPicker(){
+    $("#ppGrid").querySelectorAll(".pp-page").forEach(function(b){
+      b.classList.toggle("on", ppSel.indexOf(+b.getAttribute("data-page"))>=0);
+    });
+    var k=ppSel.length, use=$("#ppUse");
+    use.disabled=!k;
+    use.textContent = k===0 ? "Use pages" : (k===1 ? "Use page "+ppSel[0] : "Use "+k+" pages");
+    $("#ppCount").textContent = k ? k+" picked" : "Tap pages to pick them.";
+  }
+  $("#ppGrid").addEventListener("click",function(e){
+    var b=e.target.closest(".pp-page"); if(!b) return;
+    var n=+b.getAttribute("data-page"), i=ppSel.indexOf(n);
+    if(i<0) ppSel.push(n); else ppSel.splice(i,1);
+    ppSel.sort(function(x,y){ return x-y; });
+    syncPicker();
+  });
+  function applyRange(){
+    if(!pdfDoc) return;
+    var picked=parseRange($("#ppRange").value, pdfDoc.numPages);
+    if(!picked.length){ $("#ppCount").textContent="Couldn't read that range — try 1-5, 12"; return; }
+    ppSel=picked; syncPicker();
+  }
+  $("#ppRangeBtn").addEventListener("click",applyRange);
+  $("#ppRange").addEventListener("keydown",function(e){ if(e.key==="Enter"){ e.preventDefault(); applyRange(); } });
+  $("#ppAllBtn").addEventListener("click",function(){ ppSel=[]; for(var p=1;p<=pdfDoc.numPages;p++) ppSel.push(p); syncPicker(); });
+  $("#ppNoneBtn").addEventListener("click",function(){ ppSel=[]; syncPicker(); });
+  $("#ppCancel").addEventListener("click",closePicker);
+  $("#pdfPick").addEventListener("click",function(e){ if(e.target===this) closePicker(); });
+  document.addEventListener("keydown",function(e){ if(e.key==="Escape" && !$("#pdfPick").hidden) closePicker(); });
+  $("#ppUse").addEventListener("click",function(){
+    if(!ppSel.length) return;
+    var keep=pdfPages[pdfIdx];
+    pdfPages=ppSel.slice();
+    pdfIdx=Math.max(0,pdfPages.indexOf(keep));
+    closePicker();
+    showPdfPage();
+  });
+  $("#pdfChooseBtn").addEventListener("click",openPicker);
+
+  // ----- Rendering a page at the device's real resolution -----
+  // Render big enough to cover the preset at the 2× export scale, capped so phones don't run out of canvas memory.
+  function pdfNeedScale(base){
+    var d=currentDims(), s=Math.max(2*d.w/base.width, 2*d.h/base.height);
+    if(state.pdfTrim) s*=1.25; // trimming crops the page, so leave headroom
+    return Math.min(s, 4096/Math.max(base.width,base.height));
+  }
+  function renderPdfPage(n){
+    return pdfDoc.getPage(n).then(function(page){
+      var vp1=page.getViewport({scale:1}), base={width:vp1.width,height:vp1.height};
+      var s=pdfNeedScale(base), vp=page.getViewport({scale:s});
+      var c=document.createElement("canvas"); c.width=Math.ceil(vp.width); c.height=Math.ceil(vp.height);
+      var g=c.getContext("2d"); g.fillStyle="#fff"; g.fillRect(0,0,c.width,c.height);
+      return page.render({canvasContext:g, viewport:vp}).promise.then(function(){
+        page.cleanup();
+        return {page:n, canvas:c, base:base, need:s};
+      });
+    });
+  }
+
+  // Crop white margins. A row or column only counts as content once it holds more ink than the
+  // speck allowance, so scanner dust and a lone page number don't stop the trim.
+  function trimMargins(src,sens){
+    var w=src.width, h=src.height, d;
+    try{ d=src.getContext("2d").getImageData(0,0,w,h).data; }catch(e){ return src; }
+    var rows=new Uint32Array(h), cols=new Uint32Array(w), i=0;
+    for(var y=0;y<h;y++){ for(var x=0;x<w;x++,i+=4){
+      if(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]<200){ rows[y]++; cols[x]++; }
+    } }
+    var rowMin=Math.max(1,Math.round(w*sens/100*0.02)), colMin=Math.max(1,Math.round(h*sens/100*0.02));
+    var top=0, bot=h-1, left=0, right=w-1;
+    while(top<h && rows[top]<rowMin) top++;
+    while(bot>top && rows[bot]<rowMin) bot--;
+    while(left<w && cols[left]<colMin) left++;
+    while(right>left && cols[right]<colMin) right--;
+    if(top>=bot || left>=right) return src;
+    var pad=Math.round(Math.min(w,h)*0.015);
+    top=Math.max(0,top-pad); left=Math.max(0,left-pad); bot=Math.min(h-1,bot+pad); right=Math.min(w-1,right+pad);
+    var out=document.createElement("canvas"); out.width=right-left+1; out.height=bot-top+1;
+    out.getContext("2d").drawImage(src,left,top,out.width,out.height,0,0,out.width,out.height);
+    return out;
+  }
+
+  function setPdfImage(raw){
+    pdfRaw=raw; pdfActive=true;
+    userImage=state.pdfTrim ? trimMargins(raw.canvas,state.pdfTrimSens) : raw.canvas;
+    imgToken++; imgCache={canvas:null,key:""};
+    $("#imgControls").style.display="block";
+    $("#imgFileLabel").textContent="＋ Add an image (jpg · png · webp)";
+    $("#imgFile").value="";
+    $("#imgState").textContent="PDF page "+raw.page;
+    render();
+  }
+  function showPdfPage(){
+    updatePdfUI();
+    if(!pdfDoc || !pdfPages.length) return;
+    var n=pdfPages[pdfIdx], seq=++pdfRenderSeq;
+    $("#imgState").textContent="rendering page "+n+"…";
+    renderPdfPage(n).then(function(raw){ if(seq===pdfRenderSeq) setPdfImage(raw); })
+      .catch(function(){ if(seq===pdfRenderSeq) $("#imgState").textContent="couldn't render page "+n; });
+  }
+  // Called after every render: switching to a bigger preset re-renders the page so it stays sharp.
+  function pdfCheckRes(){
+    if(!pdfActive || !pdfRaw.canvas) return;
+    if(pdfNeedScale(pdfRaw.base) > pdfRaw.need*1.05){ clearTimeout(pdfResTimer); pdfResTimer=setTimeout(showPdfPage,250); }
+  }
+  function refreshPdfTrim(){
+    if(!pdfActive || !pdfRaw.canvas) return;
+    userImage=state.pdfTrim ? trimMargins(pdfRaw.canvas,state.pdfTrimSens) : pdfRaw.canvas;
+    imgToken++; imgCache={canvas:null,key:""};
+    render();
+  }
+
+  $("#pdfPrev").addEventListener("click",function(){ if(pdfIdx>0){ pdfIdx--; showPdfPage(); } });
+  $("#pdfNext").addEventListener("click",function(){ if(pdfIdx<pdfPages.length-1){ pdfIdx++; showPdfPage(); } });
+  $("#pdfTrimChk").addEventListener("change",function(e){
+    state.pdfTrim=e.target.checked;
+    $("#pdfTrimField").style.display=state.pdfTrim?"block":"none";
+    refreshPdfTrim();
+  });
+  $("#pdfTrimRange").addEventListener("input",function(e){
+    state.pdfTrimSens=+e.target.value; $("#pdfTrimVal").textContent=e.target.value;
+    clearTimeout(pdfTrimTimer); pdfTrimTimer=setTimeout(refreshPdfTrim,150);
+  });
+
+  // Saves every picked page with the current look, one file at a time, then returns to the page you were on.
+  $("#pdfAllBtn").addEventListener("click",function(){
+    var btn=this, pages=pdfPages.slice(), fmt=state.exportFormat, keep=pdfIdx, i=0;
+    if(btn.disabled || !pages.length) return;
+    btn.disabled=true;
+    function next(){
+      if(i>=pages.length || !pdfDoc){
+        btn.disabled=false; pdfIdx=Math.min(keep,Math.max(0,pdfPages.length-1)); showPdfPage(); return;
+      }
+      btn.textContent="Saving "+(i+1)+" of "+pages.length+"…";
+      var n=pages[i++];
+      pdfRenderSeq++;
+      renderPdfPage(n).then(function(raw){
+        setPdfImage(raw);
+        downloadCanvasAs(renderExportCanvas(), fmt);
+        setTimeout(next,450);
+      }).catch(function(){ setTimeout(next,0); });
+    }
+    next();
   });
   $("#imgBrightRange").addEventListener("input",function(e){ state.imgBright=+e.target.value; $("#imgBrightVal").textContent=e.target.value; render(); });
   $("#imgContrastRange").addEventListener("input",function(e){ state.imgContrast=+e.target.value; $("#imgContrastVal").textContent=e.target.value; render(); });
@@ -1660,7 +2006,8 @@ stay hungry.</textarea>
   function filename(){ var d=currentDims(); return "eink-wallpaper-"+d.w+"x"+d.h+".png"; }
   function filenameFor(fmt){
     var d=currentDims(), png=(fmt==="png"||fmt==="pngT");
-    return "eink-wallpaper-"+d.w+"x"+d.h+(isTransparentFmt(fmt)?"-overlay":"")+"."+(png?"png":"bmp");
+    var base=(pdfActive && pdfRaw.page) ? "eink-"+pdfSlug()+"-p"+pdfRaw.page : "eink-wallpaper";
+    return base+"-"+d.w+"x"+d.h+(isTransparentFmt(fmt)?"-overlay":"")+"."+(png?"png":"bmp");
   }
 
   // Encode a canvas as an uncompressed 32-bit BGRA BMP, keeping per-pixel transparency.
@@ -1783,8 +2130,9 @@ stay hungry.</textarea>
   });
 
   // ---------- Version, changelog & share image ----------
-  var VERSION="1.11";
+  var VERSION="1.12";
   var CHANGELOG=[
+    ["1.12","Import pages from a PDF: pick pages from thumbnails or a range, step through them, trim white margins, and download them all. The PDF reader only downloads when you use it. Fixed Save this app."],
     ["1.11","Remembers your last session, foldable cards, and one Surprise me button (tap for words, hold for a new look). Removed the QR code and Halftone."],
     ["1.10","Transparent overlay export (PNG or 32-bit BMP) for readers that draw the sleep image over your last page, with a sample-page preview."],
     ["1.9","Ink stamp: a standalone Stamp layout and a stamp overlay for any layout, box or round, with seeded ink wear. Fixed the Kobo install hint."],
@@ -1878,8 +2226,9 @@ stay hungry.</textarea>
     // External scripts (e.g. the injected badge) won't resolve off-host; keep our own inline scripts.
     html = html.replace(/<script[^>]+\bsrc=[^>]*><\/script>/gi, "");
     html = html.replace(/<script[^>]+\bsrc=[^>]*\/>/gi, "");
-    //  would rewrite relative paths; nonces are meaningless once the CSP is gone.
-    html = html.replace(/]*>/gi, "");
+    // A base tag would rewrite relative paths; nonces are meaningless once the CSP is gone.
+    // Built from pieces so this line can't match (and strip) its own source in the snapshot.
+    html = html.replace(new RegExp("<"+"base\\b[^>]*>","gi"), "");
     html = html.replace(/\snonce=["'][^"']*["']/gi, "");
     if(!/^<!doctype/i.test(html)) html = "<!DOCTYPE html>\n" + html;
     return html;
@@ -1978,6 +2327,7 @@ stay hungry.</textarea>
       imgZoom:state.imgZoom, imgPanX:state.imgPanX, imgPanY:state.imgPanY,
       imgThreshold:state.imgThreshold, imgVignette:state.imgVignette, imgRound:state.imgRound,
       paperGrain:state.paperGrain,
+      pdfTrim:state.pdfTrim, pdfTrimSens:state.pdfTrimSens,
       autoText:state.autoText, safeZone:state.safeZone,
       stampOn:state.stampOn, stampText:state.stampText, stampDate:state.stampDate, stampShape:state.stampShape,
       stampPos:state.stampPos, stampWear:state.stampWear, stampSeed:state.stampSeed,
@@ -2011,6 +2361,8 @@ stay hungry.</textarea>
     if(s.imgVignette!=null) state.imgVignette=+s.imgVignette;
     if(s.imgRound!=null) state.imgRound=+s.imgRound;
     if(s.paperGrain!=null) state.paperGrain=+s.paperGrain;
+    if(s.pdfTrim!=null) state.pdfTrim=!!s.pdfTrim;
+    if(s.pdfTrimSens!=null) state.pdfTrimSens=+s.pdfTrimSens;
     if(s.autoText!=null) state.autoText=!!s.autoText;
     if(s.stampOn!=null) state.stampOn=!!s.stampOn;
     if(s.stampText!=null) state.stampText=s.stampText;
@@ -2044,6 +2396,8 @@ stay hungry.</textarea>
     $("#imgVignetteRange").value=state.imgVignette; $("#imgVignetteVal").textContent=state.imgVignette;
     $("#imgRoundRange").value=state.imgRound; $("#imgRoundVal").textContent=state.imgRound;
     $("#paperGrainRange").value=state.paperGrain; $("#paperGrainVal").textContent=state.paperGrain;
+    $("#pdfTrimChk").checked=state.pdfTrim; $("#pdfTrimField").style.display=state.pdfTrim?"block":"none";
+    $("#pdfTrimRange").value=state.pdfTrimSens; $("#pdfTrimVal").textContent=state.pdfTrimSens;
     $("#imgFadeRange").value=state.imgFade; $("#imgFadeVal").textContent=state.imgFade+"%";
 
     $("#borderChk").checked=state.border;
