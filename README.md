@@ -80,6 +80,18 @@ Load a JPG/PNG/WebP and it's converted to grayscale and sized to the preset.
 - **Adjust tone:** brightness, contrast, sharpen
 - **Effects:** threshold, vignette, rounded corners
 
+### PDF pages
+
+Turn pages from a PDF into wallpapers: comic and manga pages, book covers, art books, or anything else.
+
+- **Import pages from a PDF** (in the Photo card) opens a page picker with thumbnails. Tap pages, or type a range like `1-5, 12, 20-`.
+- Step through your picked pages with **‹ ›**. The current page becomes the photo, so every Look, tone, fit and export setting applies.
+- **Trim white margins** crops the blank border. Raise **Ignore specks** if a scanned page won't trim because of dust or a page number.
+- **Download all pages** saves every picked page with the current look. On iPhone, save pages one at a time instead.
+- Pages render at your device's full resolution and re-render if you switch to a larger preset.
+
+The PDF reader (pdf.js) is only downloaded the first time you import a PDF, so that one feature needs an internet connection. Everything else still works offline.
+
 ### E-ink render & preview
 Optionally quantize the whole composition to the panel's depth (1-bit Floyd / Atkinson / Bayer, or 16-level grey) so the preview matches the device and the panel won't re-dither it.
 
