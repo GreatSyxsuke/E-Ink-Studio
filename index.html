@@ -203,7 +203,7 @@
   .pp-foot .btn-ghost,.pp-foot .btn-primary{margin:0;width:auto;padding:11px 16px;}
   .pdf-step{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;}
   .pdf-step .btn-ghost{margin:0;width:auto;padding:8px 14px;}
-  .pdf-step .btn-ghost:disabled,#pdfAllBtn:disabled{opacity:.4;cursor:default;}
+  .pdf-step .btn-ghost:disabled,#pdfAllBtn:disabled,#pdfShareBtn:disabled{opacity:.4;cursor:default;}
   .pdf-step span{text-align:center;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;}
   @media (max-width:560px){ .pp-tools{grid-template-columns:1fr 1fr 1fr;} .pp-tools input{grid-column:1/-1;} .pdf-pick{padding:0;} .pp-box{border-radius:0;height:100%;} }
 </style>
@@ -256,6 +256,19 @@ stay hungry.</textarea>
             <span id="pdfStepLabel"></span>
             <button class="btn-ghost" id="pdfNext" aria-label="Next page">›</button>
           </div>
+          <label class="field" style="margin:12px 0 8px;">
+            <span class="field-label">Two-page spreads</span>
+            <div class="seg" id="pdfSpreadSeg">
+              <button data-spread="whole" class="active">Whole</button>
+              <button data-spread="left">Left</button>
+              <button data-spread="right">Right</button>
+              <button data-spread="both">Both halves</button>
+            </div>
+          </label>
+          <label class="check" id="pdfRtlRow" style="display:none;margin-bottom:8px;">
+            <input type="checkbox" id="pdfRtlChk"> Right page first (manga)
+          </label>
+          <p class="hint" id="pdfSpreadHint" style="display:none;margin:0 0 8px;">Only wide pages are split; single pages stay whole.</p>
           <label class="check" style="margin:12px 0 8px;">
             <input type="checkbox" id="pdfTrimChk"> Trim page margins
           </label>
@@ -264,6 +277,8 @@ stay hungry.</textarea>
             <div class="range-row"><input type="range" id="pdfTrimRange" min="0" max="100" value="30"><span class="range-val" id="pdfTrimVal">30</span></div>
           </label>
           <button class="btn-ghost" id="pdfChooseBtn" style="margin-top:0;">Choose pages…</button>
+          <button class="btn-ghost" id="pdfShareBtn" style="display:none;">Prepare pages for sharing</button>
+          <p class="hint" id="pdfShareHint" style="display:none;"></p>
           <button class="btn-ghost" id="pdfAllBtn" style="display:none;">Download all pages</button>
         </div>
         <div id="imgControls" style="display:none;margin-top:12px;">
@@ -272,6 +287,15 @@ stay hungry.</textarea>
             <div class="seg" id="imgFitSeg">
               <button data-imgfit="cover" class="active">Cover</button>
               <button data-imgfit="contain">Contain</button>
+            </div>
+          </label>
+          <label class="field">
+            <span class="field-label">Rotate</span>
+            <div class="seg" id="imgRotSeg">
+              <button data-imgrot="0" class="active">0°</button>
+              <button data-imgrot="90">90° ↻</button>
+              <button data-imgrot="180">180°</button>
+              <button data-imgrot="270">90° ↺</button>
             </div>
           </label>
           <label class="field">
@@ -662,7 +686,7 @@ stay hungry.</textarea>
     imgZoom:100, imgPanX:0, imgPanY:0,
     imgThreshold:50, imgVignette:0, imgRound:0,
     paperGrain:0,
-    pdfTrim:false, pdfTrimSens:30,
+    pdfTrim:false, pdfTrimSens:30, pdfSpread:"whole", pdfRtl:false, imgRotate:"0",
     autoText:false, safeZone:false,
     stampOn:false, stampText:"OVERDUE", stampDate:"{shortdate}", stampShape:"rect", stampPos:"center", stampWear:45, stampSeed:0,
     exportFormat:"png", einkOut:"off",
@@ -816,12 +840,29 @@ stay hungry.</textarea>
     g.putImageData(img,x0,y0);
   }
 
+  // The photo turned by the Rotate setting (cached), so a sideways spread can fill a portrait screen.
+  var rotCache={key:"",canvas:null};
+  function imageSource(){
+    var r=+state.imgRotate||0;
+    if(!r) return userImage;
+    var key=imgToken+"|"+r;
+    if(rotCache.key===key) return rotCache.canvas;
+    var iw=userImage.naturalWidth||userImage.width, ih=userImage.naturalHeight||userImage.height;
+    var c=document.createElement("canvas"), swap=(r===90||r===270);
+    c.width=swap?ih:iw; c.height=swap?iw:ih;
+    var g=c.getContext("2d");
+    g.translate(c.width/2,c.height/2); g.rotate(r*Math.PI/180); g.drawImage(userImage,-iw/2,-ih/2);
+    rotCache={key:key,canvas:c};
+    return c;
+  }
+
   // Build (and cache) an offscreen canvas with the processed image sized to w×h.
   function getProcessedImageCanvas(w,h){
     if(!userImage) return null;
-    var iw=userImage.naturalWidth||userImage.width, ih=userImage.naturalHeight||userImage.height;
+    var src=imageSource();
+    var iw=src.naturalWidth||src.width, ih=src.naturalHeight||src.height;
     if(!iw||!ih) return null;
-    var key=[imgToken,w,h,state.imgFit,state.imgMode,state.imgBright,state.imgContrast,state.imgSharpen,
+    var key=[imgToken,w,h,state.imgFit,state.imgRotate,state.imgMode,state.imgBright,state.imgContrast,state.imgSharpen,
       state.imgZoom,state.imgPanX,state.imgPanY,state.imgThreshold,state.imgVignette,state.imgRound].join("|");
     if(imgCache.canvas && imgCache.key===key) return imgCache.canvas;
     var oc=document.createElement("canvas"); oc.width=w; oc.height=h;
@@ -831,7 +872,7 @@ stay hungry.</textarea>
     var dw=iw*scale, dh=ih*scale;
     var dx=(w-dw)/2 + (state.imgPanX/100)*Math.max(0,(dw-w)/2);
     var dy=(h-dh)/2 + (state.imgPanY/100)*Math.max(0,(dh-h)/2);
-    og.drawImage(userImage,dx,dy,dw,dh);
+    og.drawImage(src,dx,dy,dw,dh);
     processRegion(og,dx,dy,dw,dh,w,h);
     // Rounded corners: mask the drawn image area to a rounded rect
     if(state.imgRound>0){
@@ -1612,6 +1653,7 @@ stay hungry.</textarea>
   wireSeg("#vposSeg","vpos","vpos");
   wireSeg("#themeSeg","theme","theme");
   wireSeg("#imgFitSeg","imgFit","imgfit");
+  wireSeg("#imgRotSeg","imgRotate","imgrot");
   wireSeg("#imgModeSeg","imgMode","imgmode");
   wireSeg("#orientSeg","orientation","orient");
   wireSeg("#stampShapeSeg","stampShape","stampshape");
@@ -1719,8 +1761,15 @@ stay hungry.</textarea>
   // the photo, so every Photo, Finish and Export setting applies to it unchanged.
   var PDFJS_BASE="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/", pdfLibP=null;
   var pdfDoc=null, pdfName="", pdfPages=[], pdfIdx=0, pdfRaw={}, pdfActive=false;
+  // pdfPages = the pages you picked; pdfItems = what the stepper walks through (a wide page can become two halves).
+  var pdfItems=[], pdfAspect={}, pdfBusy=false, shareFiles=null;
   var pdfRenderSeq=0, pdfDocToken=0, pdfResTimer=null, pdfTrimTimer=null;
   var ppSel=[], ppObserver=null, thumbQueue=Promise.resolve();
+  var IS_IOS=/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+  var CAN_SHARE_FILES=(function(){
+    try{ return !!(navigator.share && navigator.canShare && navigator.canShare({files:[new File(["x"],"t.png",{type:"image/png"})]})); }
+    catch(e){ return false; }
+  })();
 
   function loadPdfLib(){
     if(window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
@@ -1771,20 +1820,32 @@ stay hungry.</textarea>
   function closePdf(){
     pdfRenderSeq++; pdfDocToken++;
     if(pdfDoc){ try{ pdfDoc.destroy(); }catch(e){} }
-    pdfDoc=null; pdfPages=[]; pdfIdx=0; pdfRaw={}; pdfActive=false;
+    pdfDoc=null; pdfPages=[]; pdfItems=[]; pdfAspect={}; pdfIdx=0; pdfRaw={}; pdfActive=false; shareFiles=null;
     $("#pdfFileLabel").textContent="＋ Import pages from a PDF";
     updatePdfUI();
   }
 
+  function partLabel(part){ return part==="left" ? " · left" : (part==="right" ? " · right" : ""); }
   function updatePdfUI(){
     $("#pdfControls").style.display=pdfDoc?"block":"none";
-    var k=pdfPages.length, many=k>1;
-    $("#pdfStepLabel").textContent = k ? "Page "+pdfPages[pdfIdx]+(many?" · "+(pdfIdx+1)+" of "+k:"") : "No pages picked yet";
-    $("#pdfPrev").disabled=pdfIdx<=0; $("#pdfNext").disabled=pdfIdx>=k-1;
+    var k=pdfItems.length, many=k>1, it=pdfItems[pdfIdx];
+    $("#pdfStepLabel").textContent = it ? "Page "+it.page+partLabel(it.part)+(many?" · "+(pdfIdx+1)+" of "+k:"")
+      : (pdfPages.length ? "Reading pages…" : "No pages picked yet");
+    $("#pdfPrev").disabled=pdfBusy||pdfIdx<=0; $("#pdfNext").disabled=pdfBusy||pdfIdx>=k-1;
     $("#pdfPrev").style.visibility=$("#pdfNext").style.visibility=many?"visible":"hidden";
-    var all=$("#pdfAllBtn");
-    all.style.display=many?"":"none";
-    if(!all.disabled) all.textContent="Download all "+k+" pages";
+    // Safari on iPhone blocks multiple downloads, so it gets Share instead of Download all.
+    var all=$("#pdfAllBtn"), share=$("#pdfShareBtn"), hint=$("#pdfShareHint");
+    all.style.display=(many && !IS_IOS)?"":"none";
+    share.style.display=(many && CAN_SHARE_FILES)?"":"none";
+    hint.style.display=(many && CAN_SHARE_FILES)?"block":"none";
+    all.disabled=share.disabled=pdfBusy;
+    if(!pdfBusy){
+      all.textContent="Download all "+k+" pages";
+      share.textContent = shareFiles ? "Share "+shareFiles.length+" files ↗" : "Prepare "+k+" pages for sharing";
+      hint.textContent = shareFiles
+        ? "Ready. Tap Share, then Save to Files (or Save Images for Photos). Changing any setting means preparing again."
+        : "Renders every page with the current look, then hands them all to the Share sheet at once.";
+    }
   }
 
   // Page range like "1-5, 12, 20-" → sorted unique page numbers within 1..max.
@@ -1878,30 +1939,91 @@ stay hungry.</textarea>
   document.addEventListener("keydown",function(e){ if(e.key==="Escape" && !$("#pdfPick").hidden) closePicker(); });
   $("#ppUse").addEventListener("click",function(){
     if(!ppSel.length) return;
-    var keep=pdfPages[pdfIdx];
+    var keep=pdfItems[pdfIdx];
     pdfPages=ppSel.slice();
-    pdfIdx=Math.max(0,pdfPages.indexOf(keep));
     closePicker();
-    showPdfPage();
+    rebuildItems(keep);
   });
   $("#pdfChooseBtn").addEventListener("click",openPicker);
 
+  // ----- Two-page spreads -----
+  // A page counts as a spread when it's clearly wider than tall; single pages are never split.
+  function isSpread(p){ return (pdfAspect[p]||0)>1.15; }
+  function pageAspects(pages){
+    return Promise.all(pages.map(function(p){
+      if(pdfAspect[p]) return null;
+      return pdfDoc.getPage(p).then(function(pg){ var v=pg.getViewport({scale:1}); pdfAspect[p]=v.width/v.height; });
+    }));
+  }
+  function rebuildItems(keep){
+    if(!pdfDoc) return;
+    var token=pdfDocToken, pages=pdfPages.slice(), sp=state.pdfSpread;
+    shareFiles=null; pdfItems=[]; updatePdfUI();
+    (sp==="whole" ? Promise.resolve() : pageAspects(pages)).then(function(){
+      if(token!==pdfDocToken) return;
+      var out=[];
+      pages.forEach(function(p){
+        if(sp==="whole" || !isSpread(p)) out.push({page:p, part:"whole"});
+        else if(sp==="both"){
+          var a={page:p,part:"left"}, b={page:p,part:"right"};
+          if(state.pdfRtl) out.push(b,a); else out.push(a,b);
+        }
+        else out.push({page:p, part:sp});
+      });
+      pdfItems=out;
+      // Stay on the page you were looking at (same half if it still exists).
+      var idx=0;
+      if(keep){
+        for(var i=out.length-1;i>=0;i--){ if(out[i].page===keep.page){ idx=i; if(out[i].part===keep.part) break; } }
+      }
+      pdfIdx=idx;
+      showPdfPage();
+    }).catch(function(){ if(token===pdfDocToken) $("#imgState").textContent="couldn't read the pages"; });
+  }
+  function syncSpreadUI(){
+    var both=state.pdfSpread==="both";
+    $("#pdfRtlRow").style.display=both?"flex":"none";
+    $("#pdfSpreadHint").style.display=state.pdfSpread==="whole"?"none":"block";
+  }
+  $("#pdfSpreadSeg").addEventListener("click",function(e){
+    var b=e.target.closest("button"); if(!b) return;
+    setSeg("#pdfSpreadSeg","pdfSpread","spread",b.dataset.spread);
+    syncSpreadUI(); queueSessionSave();
+    rebuildItems(pdfItems[pdfIdx]);
+  });
+  $("#pdfRtlChk").addEventListener("change",function(e){
+    state.pdfRtl=e.target.checked; queueSessionSave();
+    rebuildItems(pdfItems[pdfIdx]);
+  });
+
   // ----- Rendering a page at the device's real resolution -----
   // Render big enough to cover the preset at the 2× export scale, capped so phones don't run out of canvas memory.
-  function pdfNeedScale(base){
-    var d=currentDims(), s=Math.max(2*d.w/base.width, 2*d.h/base.height);
+  // "base" is the part being shown (a half for spreads); the cap is measured on the full page that gets rendered.
+  function pdfNeedScale(base,full){
+    var d=currentDims(), r=+state.imgRotate||0, bw=base.width, bh=base.height;
+    if(r===90||r===270){ var t=bw; bw=bh; bh=t; }
+    var s=Math.max(2*d.w/bw, 2*d.h/bh);
     if(state.pdfTrim) s*=1.25; // trimming crops the page, so leave headroom
-    return Math.min(s, 4096/Math.max(base.width,base.height));
+    return Math.min(s, 4096/Math.max(full.width,full.height));
   }
-  function renderPdfPage(n){
-    return pdfDoc.getPage(n).then(function(page){
-      var vp1=page.getViewport({scale:1}), base={width:vp1.width,height:vp1.height};
-      var s=pdfNeedScale(base), vp=page.getViewport({scale:s});
+  function halfOf(c,part){
+    if(part!=="left" && part!=="right") return c;
+    var hw=Math.floor(c.width/2), o=document.createElement("canvas");
+    o.width=part==="left"?hw:c.width-hw; o.height=c.height;
+    o.getContext("2d").drawImage(c, part==="left"?0:hw,0,o.width,o.height, 0,0,o.width,o.height);
+    return o;
+  }
+  function renderPdfPage(item){
+    return pdfDoc.getPage(item.page).then(function(page){
+      var vp1=page.getViewport({scale:1}), full={width:vp1.width,height:vp1.height};
+      var half=item.part==="left"||item.part==="right";
+      var base=half ? {width:full.width/2,height:full.height} : full;
+      var s=pdfNeedScale(base,full), vp=page.getViewport({scale:s});
       var c=document.createElement("canvas"); c.width=Math.ceil(vp.width); c.height=Math.ceil(vp.height);
       var g=c.getContext("2d"); g.fillStyle="#fff"; g.fillRect(0,0,c.width,c.height);
       return page.render({canvasContext:g, viewport:vp}).promise.then(function(){
         page.cleanup();
-        return {page:n, canvas:c, base:base, need:s};
+        return {page:item.page, part:item.part, canvas:halfOf(c,item.part), base:base, full:full, need:s};
       });
     });
   }
@@ -1959,21 +2081,24 @@ stay hungry.</textarea>
     $("#imgControls").style.display="block";
     $("#imgFileLabel").textContent="＋ Add an image (jpg · png · webp)";
     $("#imgFile").value="";
-    $("#imgState").textContent="PDF page "+raw.page;
+    $("#imgState").textContent="PDF page "+raw.page+partLabel(raw.part);
     render();
   }
   function showPdfPage(){
     updatePdfUI();
-    if(!pdfDoc || !pdfPages.length) return;
-    var n=pdfPages[pdfIdx], seq=++pdfRenderSeq;
-    $("#imgState").textContent="rendering page "+n+"…";
-    renderPdfPage(n).then(function(raw){ if(seq===pdfRenderSeq) setPdfImage(raw); })
-      .catch(function(){ if(seq===pdfRenderSeq) $("#imgState").textContent="couldn't render page "+n; });
+    if(!pdfDoc || !pdfItems.length) return;
+    var it=pdfItems[pdfIdx], seq=++pdfRenderSeq;
+    $("#imgState").textContent="rendering page "+it.page+"…";
+    renderPdfPage(it).then(function(raw){ if(seq===pdfRenderSeq) setPdfImage(raw); })
+      .catch(function(){ if(seq===pdfRenderSeq) $("#imgState").textContent="couldn't render page "+it.page; });
   }
-  // Called after every render: switching to a bigger preset re-renders the page so it stays sharp.
+  // Called after every render: switching to a bigger preset (or rotating) re-renders the page so it stays sharp.
+  // Any change outside a save run also means prepared share files no longer match the look.
   function pdfCheckRes(){
+    if(pdfBusy) return;
+    if(shareFiles){ shareFiles=null; updatePdfUI(); }
     if(!pdfActive || !pdfRaw.canvas) return;
-    if(pdfNeedScale(pdfRaw.base) > pdfRaw.need*1.05){ clearTimeout(pdfResTimer); pdfResTimer=setTimeout(showPdfPage,250); }
+    if(pdfNeedScale(pdfRaw.base,pdfRaw.full) > pdfRaw.need*1.05){ clearTimeout(pdfResTimer); pdfResTimer=setTimeout(showPdfPage,250); }
   }
   function refreshPdfTrim(){
     if(!pdfActive || !pdfRaw.canvas) return;
@@ -1982,8 +2107,8 @@ stay hungry.</textarea>
     render();
   }
 
-  $("#pdfPrev").addEventListener("click",function(){ if(pdfIdx>0){ pdfIdx--; showPdfPage(); } });
-  $("#pdfNext").addEventListener("click",function(){ if(pdfIdx<pdfPages.length-1){ pdfIdx++; showPdfPage(); } });
+  $("#pdfPrev").addEventListener("click",function(){ if(!pdfBusy && pdfIdx>0){ pdfIdx--; showPdfPage(); } });
+  $("#pdfNext").addEventListener("click",function(){ if(!pdfBusy && pdfIdx<pdfItems.length-1){ pdfIdx++; showPdfPage(); } });
   $("#pdfTrimChk").addEventListener("change",function(e){
     state.pdfTrim=e.target.checked;
     $("#pdfTrimField").style.display=state.pdfTrim?"block":"none";
@@ -1994,25 +2119,66 @@ stay hungry.</textarea>
     clearTimeout(pdfTrimTimer); pdfTrimTimer=setTimeout(refreshPdfTrim,150);
   });
 
-  // Saves every picked page with the current look, one file at a time, then returns to the page you were on.
-  $("#pdfAllBtn").addEventListener("click",function(){
-    var btn=this, pages=pdfPages.slice(), fmt=state.exportFormat, keep=pdfIdx, i=0;
-    if(btn.disabled || !pages.length) return;
-    btn.disabled=true;
-    function next(){
-      if(i>=pages.length || !pdfDoc){
-        btn.disabled=false; pdfIdx=Math.min(keep,Math.max(0,pdfPages.length-1)); showPdfPage(); return;
-      }
-      btn.textContent="Saving "+(i+1)+" of "+pages.length+"…";
-      var n=pages[i++];
-      pdfRenderSeq++;
-      renderPdfPage(n).then(function(raw){
+  // Run every page (or half) through the current look, one at a time, then return to where you were.
+  // onItem gets the finished export canvas and its filename, and may return a promise to pace the run.
+  function eachPdfItem(btn,verb,onItem){
+    var items=pdfItems.slice(), keepRaw=pdfRaw, keepIdx=pdfIdx, fmt=state.exportFormat, i=0;
+    pdfBusy=true; pdfRenderSeq++; updatePdfUI();
+    function step(){
+      if(i>=items.length || !pdfDoc) return Promise.resolve();
+      btn.textContent=verb+" "+(i+1)+" of "+items.length+"…";
+      var it=items[i++];
+      return renderPdfPage(it).then(function(raw){
         setPdfImage(raw);
-        downloadCanvasAs(renderExportCanvas(), fmt);
-        setTimeout(next,450);
-      }).catch(function(){ setTimeout(next,0); });
+        return onItem(renderExportCanvas(), filenameFor(fmt), fmt);
+      }, function(){}).then(step);
     }
-    next();
+    function finish(){
+      pdfBusy=false;
+      if(!pdfDoc){ updatePdfUI(); return; } // the PDF was closed mid-run
+      pdfIdx=Math.min(keepIdx,Math.max(0,pdfItems.length-1));
+      if(keepRaw && keepRaw.canvas) setPdfImage(keepRaw); else showPdfPage();
+      updatePdfUI();
+    }
+    return step().then(finish,function(err){ finish(); throw err; });
+  }
+
+  $("#pdfAllBtn").addEventListener("click",function(){
+    if(pdfBusy || !pdfItems.length) return;
+    eachPdfItem(this,"Saving",function(cv,name,fmt){
+      downloadCanvasAs(cv,fmt,name);
+      return new Promise(function(res){ setTimeout(res,450); });
+    });
+  });
+
+  // Share all: the Share sheet must open straight from a tap, and rendering takes longer than iOS
+  // allows, so the first tap prepares the files and the second tap shares them.
+  function canvasBlob(cv,fmt){
+    if(fmt==="bmp24") return Promise.resolve(canvasToBMP24(cv));
+    if(fmt==="bmp32") return Promise.resolve(canvasToBMP32(cv));
+    return new Promise(function(res,rej){ cv.toBlob(function(b){ b?res(b):rej(new Error("blob")); },"image/png"); });
+  }
+  $("#pdfShareBtn").addEventListener("click",function(){
+    if(pdfBusy || !pdfItems.length) return;
+    if(shareFiles){
+      var files=shareFiles;
+      if(navigator.canShare && !navigator.canShare({files:files})){
+        alert("This browser won't share these files. Try switching File format to PNG, or save pages one at a time.");
+        return;
+      }
+      navigator.share({files:files, title:pdfName})
+        .then(function(){ shareFiles=null; updatePdfUI(); })
+        .catch(function(err){ if(!err || err.name!=="AbortError") alert("Couldn't open the Share sheet. Try fewer pages, or save them one at a time."); });
+      return;
+    }
+    var made=[];
+    eachPdfItem(this,"Preparing",function(cv,name,fmt){
+      return canvasBlob(cv,fmt).then(function(b){
+        made.push(new File([b],name,{type:b.type||(fmt==="bmp24"||fmt==="bmp32"?"image/bmp":"image/png")}));
+      });
+    }).then(function(){
+      if(made.length){ shareFiles=made; updatePdfUI(); }
+    }).catch(function(){ alert("Couldn't prepare the pages. Try fewer at a time."); });
   });
   $("#imgBrightRange").addEventListener("input",function(e){ state.imgBright=+e.target.value; $("#imgBrightVal").textContent=e.target.value; render(); });
   $("#imgContrastRange").addEventListener("input",function(e){ state.imgContrast=+e.target.value; $("#imgContrastVal").textContent=e.target.value; render(); });
@@ -2029,7 +2195,8 @@ stay hungry.</textarea>
   function filename(){ var d=currentDims(); return "eink-wallpaper-"+d.w+"x"+d.h+".png"; }
   function filenameFor(fmt){
     var d=currentDims(), png=(fmt==="png"||fmt==="pngT");
-    var base=(pdfActive && pdfRaw.page) ? "eink-"+pdfSlug()+"-p"+pdfRaw.page : "eink-wallpaper";
+    var part=pdfRaw.part==="left"?"L":(pdfRaw.part==="right"?"R":"");
+    var base=(pdfActive && pdfRaw.page) ? "eink-"+pdfSlug()+"-p"+pdfRaw.page+part : "eink-wallpaper";
     return base+"-"+d.w+"x"+d.h+(isTransparentFmt(fmt)?"-overlay":"")+"."+(png?"png":"bmp");
   }
 
@@ -2153,8 +2320,9 @@ stay hungry.</textarea>
   });
 
   // ---------- Version, changelog & share image ----------
-  var VERSION="1.13";
+  var VERSION="1.14";
   var CHANGELOG=[
+    ["1.14","Split two-page spreads into halves (with manga order), rotate any photo or page, and Share all pages at once on iPhone."],
     ["1.13","Margin trim now works on scanned pages: it reads each page's own paper colour and skips scanner borders and spine shadows. Clearer iPhone instructions for Save this app."],
     ["1.12","Import pages from a PDF: pick pages from thumbnails or a range, step through them, trim white margins, and download them all. The PDF reader only downloads when you use it. Fixed Save this app."],
     ["1.11","Remembers your last session, foldable cards, and one Surprise me button (tap for words, hold for a new look). Removed the QR code and Halftone."],
@@ -2351,7 +2519,7 @@ stay hungry.</textarea>
       imgZoom:state.imgZoom, imgPanX:state.imgPanX, imgPanY:state.imgPanY,
       imgThreshold:state.imgThreshold, imgVignette:state.imgVignette, imgRound:state.imgRound,
       paperGrain:state.paperGrain,
-      pdfTrim:state.pdfTrim, pdfTrimSens:state.pdfTrimSens,
+      pdfTrim:state.pdfTrim, pdfTrimSens:state.pdfTrimSens, pdfSpread:state.pdfSpread, pdfRtl:state.pdfRtl, imgRotate:state.imgRotate,
       autoText:state.autoText, safeZone:state.safeZone,
       stampOn:state.stampOn, stampText:state.stampText, stampDate:state.stampDate, stampShape:state.stampShape,
       stampPos:state.stampPos, stampWear:state.stampWear, stampSeed:state.stampSeed,
@@ -2387,6 +2555,9 @@ stay hungry.</textarea>
     if(s.paperGrain!=null) state.paperGrain=+s.paperGrain;
     if(s.pdfTrim!=null) state.pdfTrim=!!s.pdfTrim;
     if(s.pdfTrimSens!=null) state.pdfTrimSens=+s.pdfTrimSens;
+    if(s.pdfSpread) state.pdfSpread=s.pdfSpread;
+    if(s.pdfRtl!=null) state.pdfRtl=!!s.pdfRtl;
+    if(s.imgRotate!=null) state.imgRotate=String(s.imgRotate);
     if(s.autoText!=null) state.autoText=!!s.autoText;
     if(s.stampOn!=null) state.stampOn=!!s.stampOn;
     if(s.stampText!=null) state.stampText=s.stampText;
@@ -2422,6 +2593,10 @@ stay hungry.</textarea>
     $("#paperGrainRange").value=state.paperGrain; $("#paperGrainVal").textContent=state.paperGrain;
     $("#pdfTrimChk").checked=state.pdfTrim; $("#pdfTrimField").style.display=state.pdfTrim?"block":"none";
     $("#pdfTrimRange").value=state.pdfTrimSens; $("#pdfTrimVal").textContent=state.pdfTrimSens;
+    setSeg("#pdfSpreadSeg","pdfSpread","spread",state.pdfSpread);
+    $("#pdfRtlChk").checked=state.pdfRtl;
+    syncSpreadUI();
+    setSeg("#imgRotSeg","imgRotate","imgrot",state.imgRotate);
     $("#imgFadeRange").value=state.imgFade; $("#imgFadeVal").textContent=state.imgFade+"%";
 
     $("#borderChk").checked=state.border;
