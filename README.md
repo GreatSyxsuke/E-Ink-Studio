@@ -89,6 +89,9 @@ Turn pages from a PDF into wallpapers: comic and manga pages, book covers, art b
 - **Trim page margins** crops the blank border, including cream or grey paper on scanned pages and dark scanner edges or spine shadows. Raise **Ignore specks** if dust or a page number keeps it from trimming tight.
 - **Download all pages** saves every picked page with the current look. On iPhone, save pages one at a time instead.
 - Pages render at your device's full resolution and re-render if you switch to a larger preset.
+- **Two-page spreads**: keep the whole page, only the Left or Right half, or Both halves as separate wallpapers. Turn on **Right page first** for manga. Only wide pages are split; single pages stay whole.
+- **Rotate** (in the Photo card) turns any photo or page 90° or 180°, for example to fit a spread sideways on a portrait screen.
+- **On iPhone**, tap **Prepare pages for sharing**, then **Share**, and choose Save to Files or Save Images. Safari blocks Download all, so it's hidden there.
 
 The PDF reader (pdf.js) is only downloaded the first time you import a PDF, so that one feature needs an internet connection. Everything else still works offline.
 
